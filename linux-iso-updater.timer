@@ -1,0 +1,24 @@
+[Unit]
+Description=Linux ISO Torrent Updater Timer
+Documentation=https://github.com/yourusername/LinuxTorentDownloader
+Requires=linux-iso-updater.service
+
+[Timer]
+# Run daily at 3:00 AM
+OnCalendar=daily
+# Alternative: Run every 6 hours
+# OnCalendar=00/6:00:00
+# Alternative: Run weekly on Sunday at 3:00 AM
+# OnCalendar=Sun *-*-* 03:00:00
+
+# Randomize the actual time by up to 30 minutes to avoid simultaneous requests
+RandomizedDelaySec=30min
+
+# If the system was off when the timer should have triggered, run it when it comes back
+Persistent=true
+
+# Start the timer 5 minutes after boot
+OnBootSec=5min
+
+[Install]
+WantedBy=timers.target

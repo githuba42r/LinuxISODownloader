@@ -1,0 +1,45 @@
+[Unit]
+Description=Linux ISO Torrent Updater (Docker)
+Documentation=https://github.com/yourusername/LinuxTorentDownloader
+After=network-online.target docker.service transmission-daemon.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Run as root or docker group user to access Docker socket
+User=root
+
+# Environment variables for Transmission credentials
+EnvironmentFile=-/etc/linux-iso-updater/credentials.env
+
+# Pull the latest image before running (optional, comment out if not needed)
+# ExecStartPre=/usr/bin/docker pull linux-iso-updater:latest
+
+# Remove any existing container with the same name
+ExecStartPre=-/usr/bin/docker rm -f linux-iso-updater
+
+# Run the Docker container
+ExecStart=/usr/bin/docker run --rm \
+    --name linux-iso-updater \
+    --network host \
+    --env TRANSMISSION_HOST=${TRANSMISSION_HOST:-localhost} \
+    --env TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091} \
+    --env TRANSMISSION_USER=${TRANSMISSION_USER} \
+    --env TRANSMISSION_PASS=${TRANSMISSION_PASS} \
+    linux-iso-updater:latest
+
+# Cleanup on stop
+ExecStopPost=-/usr/bin/docker rm -f linux-iso-updater
+
+# Restart policy
+Restart=on-failure
+RestartSec=30s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=linux-iso-updater
+
+[Install]
+WantedBy=multi-user.target

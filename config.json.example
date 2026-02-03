@@ -1,0 +1,6 @@
+{
+  "host": "localhost",
+  "port": 9091,
+  "username": "your_transmission_username",
+  "password": "your_transmission_password"
+}

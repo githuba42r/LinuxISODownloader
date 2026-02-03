@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  linux-iso-updater:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: linux-iso-updater:latest
+    container_name: linux-iso-updater
+    
+    # Network configuration - use host network to access local Transmission
+    network_mode: host
+    
+    # Environment variables for Transmission connection
+    environment:
+      - TRANSMISSION_HOST=${TRANSMISSION_HOST:-localhost}
+      - TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091}
+      - TRANSMISSION_USER=${TRANSMISSION_USER}
+      - TRANSMISSION_PASS=${TRANSMISSION_PASS}
+    
+    # Alternative: Load from .env file
+    # env_file:
+    #   - .env
+    
+    # Restart policy (for one-time runs, use 'no'; for daemon mode, use 'unless-stopped')
+    restart: "no"
+    
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
