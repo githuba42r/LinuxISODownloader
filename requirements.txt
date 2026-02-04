@@ -1,3 +1,4 @@
 transmission-rpc>=4.0.0
 requests>=2.25.0
 beautifulsoup4>=4.9.0
+python-dotenv>=0.19.0

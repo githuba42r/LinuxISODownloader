@@ -43,6 +43,11 @@ ENV/
 # Example files (we'll copy them manually if needed)
 *.example
 
+# Environment files - NEVER include .env.local or secrets
+.env.local
+.env.*.local
+*.env.local
+
 # Logs
 *.log
 
@@ -54,3 +59,4 @@ ENV/
 .dockerignore
 Dockerfile
 docker-compose.yml
+

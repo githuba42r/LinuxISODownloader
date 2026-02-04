@@ -18,8 +18,17 @@ docker build -t linux-iso-updater:latest .
 ### One-time Execution
 
 ```bash
-# Using environment file
+# Normal run - using environment file
 docker run --rm --network host --env-file .env linux-iso-updater:latest
+
+# Dry-run mode - see what would be done
+docker run --rm --network host --env-file .env linux-iso-updater:latest --dry-run
+
+# Update specific distribution only
+docker run --rm --network host --env-file .env linux-iso-updater:latest --distro debian
+
+# Dry-run for specific distribution
+docker run --rm --network host --env-file .env linux-iso-updater:latest --dry-run --distro ubuntu
 
 # Using individual environment variables
 docker run --rm --network host \
@@ -33,6 +42,29 @@ docker run --rm --network host \
 docker-compose up
 ```
 
+### Command Line Arguments
+
+The container accepts the same arguments as the Python script:
+
+| Argument | Short | Description |
+|----------|-------|-------------|
+| `--dry-run` | `-n` | Show what would be done without making changes |
+| `--distro <name>` | `-d <name>` | Update specific distro (centos, debian, ubuntu, arch, all) |
+
+**Examples:**
+
+```bash
+# Dry-run for all distributions
+docker run --rm --network host --env-file .env linux-iso-updater:latest --dry-run
+
+# Show help
+docker run --rm linux-iso-updater:latest --help
+
+# Update only Ubuntu, dry-run mode
+docker run --rm --network host --env-file .env \
+  linux-iso-updater:latest --dry-run --distro ubuntu
+```
+
 ### Interactive Debugging
 
 ```bash
@@ -42,7 +74,8 @@ docker run -it --rm --network host --env-file .env \
   linux-iso-updater:latest
 
 # Inside the container, run the script manually:
-python /app/linux_iso_torrent_updater.py
+python /app/linux_iso_torrent_updater.py --dry-run
+python /app/linux_iso_torrent_updater.py --distro debian
 ```
 
 ## Systemd Integration
@@ -116,12 +149,56 @@ docker-compose down
 
 ### Environment Configuration
 
-Edit `.env` file:
+The project supports multiple `.env` files for different environments:
+
+#### For Development
 
 ```bash
+# Use development configuration
+cp .env.development.example .env.development
+nano .env.development
+
+# Run with development settings
+docker run --rm --network host --env-file .env.development linux-iso-updater:latest
+```
+
+#### For Local Testing
+
+```bash
+# Create local configuration (never committed)
+cp .env.local.example .env.local
+nano .env.local
+
+# Run with local settings
+docker run --rm --network host --env-file .env.local linux-iso-updater:latest
+```
+
+#### For Production/Docker Compose
+
+```bash
+# Use standard .env file
 cp .env.example .env
 nano .env
+
+# Run with docker-compose (automatically uses .env)
+docker-compose up
 ```
+
+#### Environment File Priority
+
+When using docker-compose, you can specify multiple env files:
+
+```yaml
+# docker-compose.override.yml
+services:
+  linux-iso-updater:
+    env_file:
+      - .env                # Base configuration
+      - .env.development    # Development overrides
+      - .env.local          # Local overrides (highest priority)
+```
+
+**Note:** The Python script automatically loads `.env`, `.env.development`, and `.env.local` files when running natively, but Docker requires explicit `--env-file` or `env_file` configuration.
 
 ## Maintenance
 

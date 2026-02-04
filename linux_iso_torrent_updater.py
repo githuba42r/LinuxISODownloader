@@ -10,22 +10,45 @@ import os
 import sys
 import time
 import hashlib
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 import transmission_rpc
+from dotenv import load_dotenv
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/var/log/linux-iso-updater.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
+# Logger will be configured in main() after parsing command-line arguments
+logger = None
+
+def setup_logging(log_file: Optional[str] = None):
+    """
+    Setup logging with console output and optional file logging.
+    
+    Args:
+        log_file: Optional path to log file. If None, only logs to console.
+    """
+    handlers = [logging.StreamHandler(sys.stdout)]
+    
+    if log_file:
+        try:
+            # Expand user path and create parent directory if needed
+            log_path = Path(log_file).expanduser()
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            handlers.append(logging.FileHandler(log_path))
+            print(f"Logging to file: {log_path}", file=sys.stderr)
+        except (PermissionError, OSError) as e:
+            print(f"Warning: Could not write to log file {log_file}: {e}", file=sys.stderr)
+            print("Continuing with console-only logging", file=sys.stderr)
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=handlers,
+        force=True  # Allow reconfiguration
+    )
+    
+    return logging.getLogger(__name__)
 
 
 class DistroTorrentFinder:
@@ -40,30 +63,44 @@ class DistroTorrentFinder:
 
 
 class CentOSTorrentFinder(DistroTorrentFinder):
-    """Find latest CentOS Stream torrent."""
+    """Find latest CentOS Stream torrent from LinuxTracker.org."""
     
     def __init__(self):
         super().__init__("CentOS")
-        self.base_url = "https://www.centos.org/download/"
+        # CentOS no longer provides official torrents, use LinuxTracker as source
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=centos+stream+9&order=3&by=2"
         
     def get_latest_torrent_url(self) -> Optional[str]:
         try:
-            # CentOS Stream 9 is the current version
-            # Look for torrent on the official mirror
-            torrent_url = "https://mirrors.centos.org/mirrorlist?path=/9-stream/BaseOS/x86_64/iso/CentOS-Stream-9-latest-x86_64-dvd1.iso.torrent&redirect=1&protocol=https"
+            # Note: CentOS official mirrors no longer provide .torrent files
+            # We use LinuxTracker.org as a community source for CentOS torrents
             
-            response = requests.get(torrent_url, timeout=30, allow_redirects=True)
-            if response.status_code == 200 and b'.torrent' in response.content[:1000]:
-                logger.info(f"Found CentOS torrent: {response.url}")
-                return response.url
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access LinuxTracker for CentOS torrents")
+                return None
             
-            # Fallback: Try direct mirror
-            mirror_url = "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/iso/CentOS-Stream-9-latest-x86_64-dvd1.iso.torrent"
-            response = requests.head(mirror_url, timeout=30)
-            if response.status_code == 200:
-                logger.info(f"Found CentOS torrent: {mirror_url}")
-                return mirror_url
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for CentOS Stream 9 x86_64 DVD torrent (most recent)
+            # Find all torrent detail links
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                title = str(link.get('title', ''))
                 
+                # Look for x86_64 DVD1 torrents for Stream 9
+                if ('CentOS-Stream-9' in title and 
+                    'x86_64-dvd1.iso' in title and
+                    'torrent-details' in href):
+                    
+                    # Extract the torrent ID from the details link
+                    if 'id=' in href:
+                        torrent_id = href.split('id=')[1].split('&')[0]
+                        # Construct download URL (use download.php, not downloadcheck)
+                        torrent_url = f"https://linuxtracker.org/download.php?id={torrent_id}"
+                        logger.info(f"Found CentOS torrent on LinuxTracker: {title}")
+                        return torrent_url
+                        
         except Exception as e:
             logger.error(f"Error finding CentOS torrent: {e}")
         
@@ -186,21 +223,76 @@ class ArchTorrentFinder(DistroTorrentFinder):
         return None
 
 
+class RaspberryPiOSTorrentFinder(DistroTorrentFinder):
+    """Find latest Raspberry Pi OS torrent."""
+    
+    def __init__(self):
+        super().__init__("Raspberry Pi OS")
+        self.base_url = "https://downloads.raspberrypi.com/raspios_arm64/images/"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            # Get the list of available versions
+            response = requests.get(self.base_url, timeout=30)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Find all version directories (format: raspios_arm64-YYYY-MM-DD)
+            versions = []
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                if href.startswith('raspios_arm64-') and href.endswith('/'):
+                    versions.append(href.strip('/'))
+            
+            if not versions:
+                logger.warning("No Raspberry Pi OS versions found")
+                return None
+            
+            # Sort versions to get the latest (they're in YYYY-MM-DD format)
+            latest_version = sorted(versions)[-1]
+            version_url = urljoin(self.base_url, f"{latest_version}/")
+            
+            # Get the torrent from the version directory
+            response = requests.get(version_url, timeout=30)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for the standard arm64 torrent (not lite, not full)
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                if (href.endswith('.torrent') and 
+                    'arm64' in href and 
+                    'lite' not in href and 
+                    'full' not in href):
+                    torrent_url = urljoin(version_url, href)
+                    logger.info(f"Found Raspberry Pi OS torrent: {torrent_url}")
+                    return torrent_url
+                    
+        except Exception as e:
+            logger.error(f"Error finding Raspberry Pi OS torrent: {e}")
+        
+        return None
+
+
 class TransmissionTorrentManager:
     """Manage torrents in Transmission."""
     
-    def __init__(self, host: str, port: int, username: str, password: str):
-        self.client = transmission_rpc.Client(
-            host=host,
-            port=port,
-            username=username,
-            password=password
-        )
+    def __init__(self, host: str, port: int, username: str, password: str, dry_run: bool = False):
+        self.dry_run = dry_run
+        if dry_run:
+            logger.info("DRY-RUN MODE: No changes will be made to Transmission")
+            self.client = None
+        else:
+            self.client = transmission_rpc.Client(
+                host=host,
+                port=port,
+                username=username,
+                password=password
+            )
         self.distro_finders = {
             'centos': CentOSTorrentFinder(),
             'debian': DebianTorrentFinder(),
             'ubuntu': UbuntuTorrentFinder(),
             'arch': ArchTorrentFinder(),
+            'raspberrypi': RaspberryPiOSTorrentFinder(),
         }
         
     def get_torrent_hash(self, torrent_url: str) -> Optional[str]:
@@ -215,6 +307,10 @@ class TransmissionTorrentManager:
     
     def find_existing_torrent(self, distro_name: str) -> Optional[transmission_rpc.Torrent]:
         """Find existing torrent for a distribution by name pattern."""
+        if self.dry_run:
+            logger.info(f"[DRY-RUN] Would search for existing {distro_name} torrent")
+            return None
+            
         try:
             torrents = self.client.get_torrents()
             name_patterns = {
@@ -222,6 +318,7 @@ class TransmissionTorrentManager:
                 'debian': ['debian'],
                 'ubuntu': ['ubuntu'],
                 'arch': ['arch', 'archlinux'],
+                'raspberrypi': ['raspios', 'raspberry', 'raspberrypi'],
             }
             
             patterns = name_patterns.get(distro_name.lower(), [distro_name])
@@ -252,6 +349,9 @@ class TransmissionTorrentManager:
             logger.warning(f"Could not find latest torrent for {distro_name}")
             return
         
+        if self.dry_run:
+            logger.info(f"[DRY-RUN] Found latest {distro_name} torrent URL: {latest_url}")
+        
         # Check if we already have this torrent
         existing_torrent = self.find_existing_torrent(distro_name)
         
@@ -265,8 +365,20 @@ class TransmissionTorrentManager:
             new_torrent_data = response.content
             new_hash = hashlib.sha256(new_torrent_data).hexdigest()
             
+            if self.dry_run:
+                logger.info(f"[DRY-RUN] Downloaded torrent (hash: {new_hash[:16]}...)")
+            
             # If we have an existing torrent, check if it's the same
             if existing_torrent:
+                if self.dry_run:
+                    logger.info(f"[DRY-RUN] Existing {distro_name} torrent found: {existing_torrent.name}")
+                    logger.info(f"[DRY-RUN] Would check if new torrent is different")
+                    logger.info(f"[DRY-RUN] Actions that would be taken:")
+                    logger.info(f"[DRY-RUN]   1. Add new torrent from {latest_url}")
+                    logger.info(f"[DRY-RUN]   2. If different, remove old torrent: {existing_torrent.name} (ID: {existing_torrent.id})")
+                    logger.info(f"[DRY-RUN]   3. Delete old torrent data")
+                    return
+                
                 # We can't directly compare hashes, so we'll compare by checking
                 # if adding the "new" torrent would be a duplicate
                 logger.info(f"Existing {distro_name} torrent found, checking if update is needed...")
@@ -290,6 +402,12 @@ class TransmissionTorrentManager:
                         raise
             else:
                 # No existing torrent, just add it
+                if self.dry_run:
+                    logger.info(f"[DRY-RUN] No existing {distro_name} torrent found")
+                    logger.info(f"[DRY-RUN] Would add new torrent from {latest_url}")
+                    logger.info(f"[DRY-RUN] Torrent hash: {new_hash[:16]}...")
+                    return
+                
                 logger.info(f"Adding new {distro_name} torrent...")
                 self.client.add_torrent(new_torrent_data)
                 logger.info(f"Successfully added {distro_name} torrent")
@@ -312,46 +430,214 @@ class TransmissionTorrentManager:
         logger.info("Torrent update check completed")
 
 
+def load_dotenv_files():
+    """
+    Load environment variables from .env files in priority order.
+    
+    Priority (highest to lowest):
+    1. .env.local (local overrides, never commit)
+    2. .env.development (development settings)
+    3. .env (default/production settings)
+    
+    Each file overrides the previous one.
+    """
+    # Determine the base directory (where the script is located)
+    script_dir = Path(__file__).parent.resolve()
+    
+    # List of env files to load in order (lowest to highest priority)
+    env_files = [
+        script_dir / '.env',
+        script_dir / '.env.development',
+        script_dir / '.env.local',
+    ]
+    
+    loaded_files = []
+    for env_file in env_files:
+        if env_file.exists():
+            load_dotenv(env_file, override=True)
+            loaded_files.append(str(env_file))
+            logger.debug(f"Loaded environment from: {env_file}")
+    
+    if loaded_files:
+        logger.info(f"Loaded {len(loaded_files)} .env file(s): {', '.join([Path(f).name for f in loaded_files])}")
+    
+    return loaded_files
+
+
 def load_config() -> Dict:
     """Load configuration from file or environment variables."""
+    # First, load .env files (if they exist)
+    load_dotenv_files()
+    
     config_file = os.path.expanduser('~/.config/linux-iso-updater/config.json')
     
     # Try to load from config file
     if os.path.exists(config_file):
         try:
             with open(config_file, 'r') as f:
+                logger.info(f"Loading config from: {config_file}")
                 return json.load(f)
         except Exception as e:
             logger.warning(f"Failed to load config file: {e}")
     
-    # Fall back to environment variables
-    return {
+    # Fall back to environment variables (including those from .env files)
+    logger.info("Loading config from environment variables")
+    
+    # Parse distros from environment variable
+    distros_env = os.getenv('DISTROS', '')
+    distros = []
+    if distros_env:
+        # Support comma-separated list: "debian,ubuntu" or "debian, ubuntu"
+        distros = [d.strip() for d in distros_env.split(',') if d.strip()]
+    
+    config = {
         'host': os.getenv('TRANSMISSION_HOST', 'localhost'),
         'port': int(os.getenv('TRANSMISSION_PORT', '9091')),
         'username': os.getenv('TRANSMISSION_USER', ''),
         'password': os.getenv('TRANSMISSION_PASS', ''),
     }
+    
+    if distros:
+        config['distros'] = distros
+    
+    return config
 
 
 def main():
     """Main entry point."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description='Linux ISO Torrent Updater for Transmission',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Normal run - update all configured torrents
+  %(prog)s
+  
+  # Dry-run - show what would be done
+  %(prog)s --dry-run
+  
+  # Update specific distribution only (overrides config)
+  %(prog)s --distro debian
+  
+  # Update multiple distributions (overrides config)
+  %(prog)s --distros debian,ubuntu
+  
+  # Dry-run for specific distribution
+  %(prog)s --dry-run --distro ubuntu
+  
+  # Log to file
+  %(prog)s --log-file /var/log/linux-iso-updater.log
+
+Environment Variables:
+  DISTROS - Comma-separated list of distributions to update
+            (e.g., "debian,ubuntu,arch,raspberrypi")
+  LOG_FILE - Path to log file (default: console only)
+  TRANSMISSION_HOST - Transmission server hostname
+  TRANSMISSION_PORT - Transmission RPC port
+  TRANSMISSION_USER - Transmission username
+  TRANSMISSION_PASS - Transmission password
+        """
+    )
+    parser.add_argument(
+        '--dry-run', '-n',
+        action='store_true',
+        help='Show what would be done without making any changes'
+    )
+    parser.add_argument(
+        '--distro', '-d',
+        choices=['centos', 'debian', 'ubuntu', 'arch', 'raspberrypi'],
+        help='Update specific distribution only (overrides config/env)'
+    )
+    parser.add_argument(
+        '--distros',
+        help='Comma-separated list of distributions (overrides config/env). Example: debian,ubuntu,arch,raspberrypi'
+    )
+    parser.add_argument(
+        '--log-file', '-l',
+        help='Path to log file (default: console only). Can also be set via LOG_FILE environment variable.'
+    )
+    
+    args = parser.parse_args()
+    
+    # Setup logging after parsing arguments
+    log_file = args.log_file or os.getenv('LOG_FILE')
+    global logger
+    logger = setup_logging(log_file)
+    
     try:
         config = load_config()
         
         if not config.get('username') or not config.get('password'):
-            logger.error("Transmission credentials not configured!")
-            logger.error("Set TRANSMISSION_USER and TRANSMISSION_PASS environment variables")
-            logger.error(f"or create config file at ~/.config/linux-iso-updater/config.json")
-            sys.exit(1)
+            if args.dry_run:
+                logger.warning("Transmission credentials not configured (OK for dry-run)")
+                config['username'] = 'dummy_user'
+                config['password'] = 'dummy_pass'
+            else:
+                logger.error("Transmission credentials not configured!")
+                logger.error("Set TRANSMISSION_USER and TRANSMISSION_PASS environment variables")
+                logger.error(f"or create config file at ~/.config/linux-iso-updater/config.json")
+                sys.exit(1)
         
         manager = TransmissionTorrentManager(
             host=config['host'],
             port=config['port'],
             username=config['username'],
-            password=config['password']
+            password=config['password'],
+            dry_run=args.dry_run
         )
         
-        manager.update_all_torrents()
+        # Determine which distributions to update
+        # Priority: command-line args > config file/env variable > all distributions
+        distros_to_update = []
+        
+        if args.distro:
+            # Single distro from command line (highest priority)
+            distros_to_update = [args.distro]
+            logger.info(f"Command-line override: updating {args.distro} only")
+        elif args.distros:
+            # Multiple distros from command line
+            distros_to_update = [d.strip() for d in args.distros.split(',') if d.strip()]
+            # Validate distros
+            valid_distros = list(manager.distro_finders.keys())
+            invalid = [d for d in distros_to_update if d not in valid_distros]
+            if invalid:
+                logger.error(f"Invalid distributions: {', '.join(invalid)}")
+                logger.error(f"Valid choices: {', '.join(valid_distros)}")
+                sys.exit(1)
+            logger.info(f"Command-line override: updating {', '.join(distros_to_update)}")
+        elif 'distros' in config and config['distros']:
+            # Distros from config file or environment variable
+            distros_to_update = config['distros']
+            # Validate distros
+            valid_distros = list(manager.distro_finders.keys())
+            invalid = [d for d in distros_to_update if d not in valid_distros]
+            if invalid:
+                logger.warning(f"Invalid distributions in config: {', '.join(invalid)} (skipping)")
+                distros_to_update = [d for d in distros_to_update if d in valid_distros]
+            
+            if not distros_to_update:
+                logger.error("No valid distributions configured")
+                sys.exit(1)
+            logger.info(f"Config/environment: updating {', '.join(distros_to_update)}")
+        else:
+            # No distros specified, update all
+            distros_to_update = list(manager.distro_finders.keys())
+            logger.info(f"No distros configured, updating all: {', '.join(distros_to_update)}")
+        
+        # Update the specified distributions
+        if len(distros_to_update) == 1:
+            manager.update_torrent(distros_to_update[0])
+        else:
+            for distro in distros_to_update:
+                try:
+                    manager.update_torrent(distro)
+                    time.sleep(2)  # Be nice to the servers
+                except Exception as e:
+                    logger.error(f"Failed to update {distro}: {e}")
+                    continue
+            logger.info("Torrent update check completed")
         
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)

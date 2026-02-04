@@ -1,18 +1,21 @@
 # Linux ISO Torrent Updater
 
-A Python script that automatically manages torrent files for the latest Linux distribution ISO images on a Transmission server. It tracks CentOS Stream, Debian, Ubuntu, and Arch Linux releases, removing old torrents and adding new ones as they become available.
+A Python script that automatically manages torrent files for the latest Linux distribution ISO images on a Transmission server. It tracks CentOS Stream, Debian, Ubuntu, Arch Linux, and Raspberry Pi OS releases, removing old torrents and adding new ones as they become available.
 
 ## Features
 
 - Automatically detects the latest ISO torrents for:
-  - CentOS Stream 9
+  - CentOS Stream 9 (via LinuxTracker.org)
   - Debian (latest stable DVD)
   - Ubuntu (latest LTS desktop)
   - Arch Linux (latest release)
+  - Raspberry Pi OS (latest arm64 release)
 - Removes old torrents and their files when updates are available
 - Integrates with Transmission via RPC
 - Runs periodically via systemd timer
 - Comprehensive logging
+
+**Note:** CentOS Stream no longer provides official torrent files. This script uses LinuxTracker.org as a community source for CentOS torrents.
 
 ## Requirements
 
@@ -116,19 +119,37 @@ sudo systemctl start linux-iso-updater.service
 
 ### 1. Install Python Dependencies
 
+It's recommended to use a virtual environment to avoid conflicts with system packages:
+
 ```bash
-pip3 install transmission-rpc requests beautifulsoup4
+# Clone or navigate to the repository
+cd LinuxTorentDownloader
+
+# Create a virtual environment
+python -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate
+
+# Install dependencies
+pip install transmission-rpc requests beautifulsoup4 python-dotenv
+```
+
+Or install system-wide:
+
+```bash
+pip3 install transmission-rpc requests beautifulsoup4 python-dotenv
 ```
 
 Or using your system package manager:
 
 ```bash
 # Debian/Ubuntu
-sudo apt install python3-requests python3-bs4
+sudo apt install python3-requests python3-bs4 python3-dotenv
 pip3 install transmission-rpc
 
 # Arch Linux
-sudo pacman -S python-requests python-beautifulsoup4
+sudo pacman -S python-requests python-beautifulsoup4 python-dotenv
 pip install transmission-rpc
 ```
 
@@ -168,18 +189,32 @@ export TRANSMISSION_USER=your_username
 export TRANSMISSION_PASS=your_password
 ```
 
-### 4. Set Up Logging
+### 4. Logging Configuration (Optional)
+
+By default, logs are output to the console only. You can optionally configure file logging in two ways:
+
+#### Option A: Command-Line Argument
 
 ```bash
-# Create log file with appropriate permissions
-sudo touch /var/log/linux-iso-updater.log
-sudo chown debian-transmission:debian-transmission /var/log/linux-iso-updater.log
+# Log to a specific file
+python linux_iso_torrent_updater.py --log-file /var/log/linux-iso-updater.log
+
+# Or use a user-writable location
+python linux_iso_torrent_updater.py --log-file ~/logs/linux-iso-updater.log
 ```
 
-Note: Replace `debian-transmission` with your Transmission user. Common alternatives:
-- Debian/Ubuntu: `debian-transmission`
-- Arch Linux: `transmission`
-- Generic: check with `ps aux | grep transmission`
+#### Option B: Environment Variable
+
+```bash
+# Set LOG_FILE environment variable
+export LOG_FILE=/var/log/linux-iso-updater.log
+python linux_iso_torrent_updater.py
+
+# Or inline
+LOG_FILE=~/logs/iso-updater.log python linux_iso_torrent_updater.py
+```
+
+Note: The command-line `--log-file` argument takes precedence over the `LOG_FILE` environment variable.
 
 ### 5. Install Systemd Units (Native)
 
@@ -205,6 +240,104 @@ sudo systemctl start linux-iso-updater.timer
 
 ## Usage
 
+### Command Line Options
+
+The script supports several command-line options:
+
+```bash
+# If using virtual environment, activate it first
+source venv/bin/activate
+
+# Show help
+python linux_iso_torrent_updater.py --help
+
+# Normal run - update configured distributions
+python linux_iso_torrent_updater.py
+
+# Dry-run - show what would be done without making changes
+python linux_iso_torrent_updater.py --dry-run
+
+# Update specific distribution only (overrides config)
+python linux_iso_torrent_updater.py --distro debian
+
+# Update multiple distributions (overrides config)
+python linux_iso_torrent_updater.py --distros debian,ubuntu
+
+# Dry-run for specific distribution
+python linux_iso_torrent_updater.py --dry-run --distro ubuntu
+
+# Or use venv python directly without activating
+venv/bin/python linux_iso_torrent_updater.py --dry-run
+
+# With log file
+python linux_iso_torrent_updater.py --log-file ~/logs/iso-updater.log
+
+# Or via environment variable
+LOG_FILE=~/logs/iso-updater.log python linux_iso_torrent_updater.py
+```
+
+**Available options:**
+- `--dry-run`, `-n`: Show what would be done without making any changes to Transmission
+- `--distro`, `-d <name>`: Update specific distribution (choices: centos, debian, ubuntu, arch, raspberrypi) - overrides config
+- `--distros <list>`: Comma-separated list of distributions - overrides config
+- `--log-file`, `-l <path>`: Path to log file (default: console only)
+
+### Configuring Which Distributions to Update
+
+You can control which distributions are updated using three methods (in priority order):
+
+#### 1. Command-Line Arguments (Highest Priority)
+
+```bash
+# Update only Debian
+python linux_iso_torrent_updater.py --distro debian
+
+# Update Debian and Ubuntu
+python linux_iso_torrent_updater.py --distros debian,ubuntu
+
+# Docker
+docker run --rm --network host --env-file .env \
+  linux-iso-updater:latest --distros debian,ubuntu
+```
+
+#### 2. Environment Variable
+
+```bash
+# Set in shell
+export DISTROS=debian,ubuntu
+python linux_iso_torrent_updater.py
+
+# Or inline
+DISTROS=debian,ubuntu python linux_iso_torrent_updater.py
+
+# In .env file
+echo "DISTROS=debian,ubuntu,arch" >> .env
+```
+
+#### 3. Configuration File
+
+Edit `~/.config/linux-iso-updater/config.json`:
+
+```json
+{
+  "host": "localhost",
+  "port": 9091,
+  "username": "myuser",
+  "password": "mypass",
+  "distros": ["debian", "ubuntu", "arch"]
+}
+```
+
+#### 4. Default (All Distributions)
+
+If none of the above are set, all distributions will be updated.
+
+**Priority order:**
+1. `--distro` or `--distros` command-line flags *(highest)*
+2. `DISTROS` environment variable
+3. `distros` in config.json
+4. All distributions *(default)*
+
 ### Docker Usage
 
 #### Manual Execution
@@ -212,7 +345,7 @@ sudo systemctl start linux-iso-updater.timer
 Run the container manually:
 
 ```bash
-# Using docker run
+# Normal run - using docker run
 docker run --rm \
   --network host \
   -e TRANSMISSION_HOST=localhost \
@@ -221,13 +354,35 @@ docker run --rm \
   -e TRANSMISSION_PASS=mypass \
   linux-iso-updater:latest
 
-# Using environment file
+# With DISTROS configured
+docker run --rm \
+  --network host \
+  -e TRANSMISSION_HOST=localhost \
+  -e TRANSMISSION_PORT=9091 \
+  -e TRANSMISSION_USER=myuser \
+  -e TRANSMISSION_PASS=mypass \
+  -e DISTROS=debian,ubuntu \
+  linux-iso-updater:latest
+
+# Dry-run mode
 docker run --rm \
   --network host \
   --env-file .env \
-  linux-iso-updater:latest
+  linux-iso-updater:latest --dry-run
 
-# Using docker-compose
+# Update specific distro only (overrides DISTROS env var)
+docker run --rm \
+  --network host \
+  --env-file .env \
+  linux-iso-updater:latest --distro debian
+
+# Dry-run for specific distro
+docker run --rm \
+  --network host \
+  --env-file .env \
+  linux-iso-updater:latest --dry-run --distro ubuntu
+
+# Using docker-compose (edit docker-compose.yml to add command arguments)
 docker-compose up
 ```
 
@@ -250,13 +405,53 @@ docker-compose build
 Run the script manually to test:
 
 ```bash
+# Normal run
 /usr/local/bin/linux_iso_torrent_updater.py
+
+# Dry-run mode
+/usr/local/bin/linux_iso_torrent_updater.py --dry-run
+
+# Update specific distro
+/usr/local/bin/linux_iso_torrent_updater.py --distro debian
+
+# Dry-run for specific distro
+/usr/local/bin/linux_iso_torrent_updater.py --dry-run --distro ubuntu
 ```
 
 Or with environment variables:
 
 ```bash
+# Normal run
 TRANSMISSION_USER=myuser TRANSMISSION_PASS=mypass python3 linux_iso_torrent_updater.py
+
+# Dry-run mode
+TRANSMISSION_USER=myuser TRANSMISSION_PASS=mypass python3 linux_iso_torrent_updater.py --dry-run
+```
+
+### Dry-Run Mode
+
+Dry-run mode allows you to see what the script would do without making any actual changes to Transmission. This is useful for:
+
+- Testing configuration before running for real
+- Seeing what torrents would be updated
+- Verifying torrent URLs are found correctly
+- Debugging without affecting your downloads
+
+**What happens in dry-run mode:**
+- ✅ Finds and downloads torrent files from distribution websites
+- ✅ Shows torrent URLs and metadata
+- ✅ Reports what actions would be taken
+- ❌ Does NOT connect to Transmission (credentials optional)
+- ❌ Does NOT add new torrents
+- ❌ Does NOT remove old torrents
+
+**Example output:**
+```
+[DRY-RUN MODE: No changes will be made to Transmission]
+Found Debian torrent: https://cdimage.debian.org/.../debian-12.0.0-amd64-DVD-1.iso.torrent
+[DRY-RUN] Downloaded torrent (hash: 1a2b3c4d5e6f7g8h...)
+[DRY-RUN] No existing debian torrent found
+[DRY-RUN] Would add new torrent from https://...
 ```
 
 ### Systemd Timer (Both Docker and Native)
@@ -306,16 +501,54 @@ sudo systemctl restart linux-iso-updater.timer
 
 ## Logging
 
+### Default Behavior
+
+By default, the script logs to **console only** (stdout). This is suitable for:
+- Interactive use
+- Docker containers (logs captured by Docker)
+- systemd services (logs captured by journald)
+- Debugging and testing
+
+### File Logging (Optional)
+
+To also log to a file, use one of these methods:
+
+#### Command-Line Option
+
+```bash
+# Log to console AND file
+python linux_iso_torrent_updater.py --log-file /path/to/logfile.log
+
+# Examples
+python linux_iso_torrent_updater.py --log-file /var/log/linux-iso-updater.log
+python linux_iso_torrent_updater.py --log-file ~/logs/iso-updater.log
+python linux_iso_torrent_updater.py -l /tmp/updater.log
+```
+
+#### Environment Variable
+
+```bash
+# Set LOG_FILE environment variable
+export LOG_FILE=/var/log/linux-iso-updater.log
+python linux_iso_torrent_updater.py
+
+# Or add to .env file
+echo "LOG_FILE=/var/log/linux-iso-updater.log" >> .env
+```
+
+**Note:** The `--log-file` command-line argument takes precedence over the `LOG_FILE` environment variable.
+
 ### Docker Logging
 
 When run via Docker, logs are output to:
 - Docker container logs (viewable with `docker logs`)
 - systemd journal (when run via systemd)
+- Optional log file (if LOG_FILE environment variable is set)
 
 View logs:
 
 ```bash
-# View container logs (if running)
+# View Docker container logs
 docker logs linux-iso-updater
 
 # View systemd journal (when using systemd + Docker)
@@ -326,21 +559,28 @@ journalctl -u linux-iso-updater.service --since "1 hour ago"
 
 # Follow docker-compose logs
 docker-compose logs -f
+
+# If using LOG_FILE environment variable, also check the log file
+tail -f /path/to/logfile.log
 ```
 
 ### Native Logging
 
-Logs are written to:
-- `/var/log/linux-iso-updater.log` (file)
+When running natively, logs are output to:
+- Console (stdout) - always enabled
+- Optional log file (if `--log-file` or `LOG_FILE` is set)
 - systemd journal (when run via systemd)
 
 View logs:
 
 ```bash
-# View log file
-tail -f /var/log/linux-iso-updater.log
+# Console output (default)
+python linux_iso_torrent_updater.py --dry-run
 
-# View systemd journal
+# If using log file, view it
+tail -f /path/to/logfile.log
+
+# View systemd journal (when run via systemd)
 journalctl -u linux-iso-updater.service -f
 
 # View logs from the last run
@@ -348,6 +588,62 @@ journalctl -u linux-iso-updater.service --since "1 hour ago"
 ```
 
 ## Configuration
+
+### Environment File Loading Priority
+
+The script supports multiple `.env` files for different environments:
+
+#### Native Python Execution
+When running the script directly, it loads `.env` files in this order (highest priority last):
+
+1. `.env` - Base configuration (can be committed)
+2. `.env.development` - Development overrides (can be committed)
+3. `.env.local` - Local overrides (**NEVER commit - contains secrets**)
+
+Then checks:
+4. Config file at `~/.config/linux-iso-updater/config.json`
+5. Environment variables from `/etc/linux-iso-updater/credentials.env` (systemd)
+6. System environment variables
+
+#### Docker Execution
+Docker uses environment variables in this order (highest priority first):
+
+1. Variables passed via `docker run -e`
+2. Variables from `--env-file` flag
+3. Variables in docker-compose.yml environment section
+4. Variables in `/etc/linux-iso-updater/credentials.env` (when using systemd)
+
+### Setting Up Environment Files
+
+#### For Development
+
+```bash
+# Copy and edit development config
+cp .env.development.example .env.development
+nano .env.development
+```
+
+#### For Local Testing
+
+```bash
+# Copy and edit local config (this file is gitignored)
+cp .env.local.example .env.local
+nano .env.local
+```
+
+#### For Production (Docker)
+
+```bash
+# Use the standard .env file
+cp .env.example .env
+nano .env
+```
+
+### Example Workflow
+
+1. **Team shared settings** → `.env` or `.env.development` (committed)
+2. **Personal local settings** → `.env.local` (never committed)
+3. **Production/Docker** → `.env` or systemd credentials
 
 ### Transmission RPC Settings
 
@@ -359,9 +655,12 @@ The Docker container uses environment variables (in order of precedence):
 
 #### Native
 The script connects to Transmission using these settings (in order of precedence):
-1. Config file at `~/.config/linux-iso-updater/config.json`
-2. Environment variables from `/etc/linux-iso-updater/credentials.env` (systemd)
-3. Environment variables (`TRANSMISSION_HOST`, `TRANSMISSION_PORT`, `TRANSMISSION_USER`, `TRANSMISSION_PASS`)
+1. Environment variables from `.env.local` (if exists)
+2. Environment variables from `.env.development` (if exists)
+3. Environment variables from `.env` (if exists)
+4. Config file at `~/.config/linux-iso-updater/config.json`
+5. Environment variables from `/etc/linux-iso-updater/credentials.env` (systemd)
+6. System environment variables (`TRANSMISSION_HOST`, `TRANSMISSION_PORT`, `TRANSMISSION_USER`, `TRANSMISSION_PASS`)
 
 Default values:
 - Host: `localhost`
@@ -488,26 +787,36 @@ transmission-remote localhost:9091 -n username:password -l
 
 #### Torrent Not Found
 
-The script searches for torrents on official distribution websites. If links change:
+The script searches for torrents from various sources:
+
+**Torrent Sources:**
+- **CentOS Stream 9**: LinuxTracker.org (community source)
+- **Debian**: Official Debian CDImage servers
+- **Ubuntu**: Official Ubuntu releases
+- **Arch Linux**: Official Arch Linux servers
+- **Raspberry Pi OS**: Official Raspberry Pi downloads
+
+If a torrent cannot be found:
 
 1. Check logs for specific errors
-2. Verify the distribution still provides torrent files
-3. Update the finder classes in the script if needed
-4. Rebuild Docker image if using Docker
+2. Verify the source is accessible (some distributions may temporarily remove torrents)
+3. For CentOS: LinuxTracker.org may be temporarily down or the page structure may have changed
+4. Try the `--dry-run` flag to see what's happening without making changes
+
+**CentOS Note:** CentOS Stream no longer provides official torrent files. This script uses LinuxTracker.org as a community-maintained source. If LinuxTracker is unavailable, CentOS torrents won't be found.
 
 #### Testing Individual Distributions
 
-You can modify the script temporarily to test one distribution:
+Test a single distribution to isolate issues:
 
-```python
-# In main(), replace:
-manager.update_all_torrents()
-
-# With:
-manager.update_torrent('debian')  # or 'ubuntu', 'centos', 'arch'
+```bash
+# Test with dry-run
+python linux_iso_torrent_updater.py --dry-run --distro debian
+python linux_iso_torrent_updater.py --dry-run --distro centos
+python linux_iso_torrent_updater.py --dry-run --distro ubuntu
+python linux_iso_torrent_updater.py --dry-run --distro arch
+python linux_iso_torrent_updater.py --dry-run --distro raspberrypi
 ```
-
-Then rebuild the Docker image or run the native script.
 
 ## Uninstallation
 

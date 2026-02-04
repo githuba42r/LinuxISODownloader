@@ -31,6 +31,12 @@ RUN python -m venv /opt/venv && \
 # Copy application files
 COPY linux_iso_torrent_updater.py .
 
+# Copy .env files if they exist (optional for local development)
+# Note: .env.local should never be in the image - use --env-file at runtime
+COPY .env* ./
+# Remove .env.local if accidentally copied
+RUN rm -f .env.local .env.*.local
+
 # Ensure script is executable
 RUN chmod +x linux_iso_torrent_updater.py
 
@@ -49,5 +55,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import transmission_rpc; import requests; import bs4" || exit 1
 
 # Run the script
-ENTRYPOINT ["/opt/venv/bin/python"]
-CMD ["/app/linux_iso_torrent_updater.py"]
+# Use ENTRYPOINT with CMD to allow passing arguments
+ENTRYPOINT ["/opt/venv/bin/python", "/app/linux_iso_torrent_updater.py"]
+CMD []
