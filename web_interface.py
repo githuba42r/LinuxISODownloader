@@ -119,12 +119,24 @@ def get_torrent_status() -> List[Dict]:
                     break
             
             if distro:
+                # Map transmission-rpc status string to status code
+                status_map = {
+                    'stopped': 0,
+                    'check pending': 1,
+                    'checking': 2,
+                    'download pending': 3,
+                    'downloading': 4,
+                    'seed pending': 5,
+                    'seeding': 6
+                }
+                status_code = status_map.get(torrent.status.lower(), 0)
+                
                 result.append({
                     'id': torrent.id,
                     'name': torrent.name,
                     'distro': distro,
-                    'status': torrent.status,
-                    'percentDone': torrent.progress,
+                    'status': status_code,
+                    'percentDone': torrent.progress / 100.0,
                     'rateDownload': torrent.rate_download,
                     'rateUpload': torrent.rate_upload,
                     'totalSize': torrent.total_size,
