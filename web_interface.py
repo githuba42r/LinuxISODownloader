@@ -546,7 +546,7 @@ def api_distros():
         'centos': {
             'id': 'centos',
             'name': 'CentOS Stream',
-            'logo': 'https://www.centos.org/assets/img/logo-centos.png',
+            'logo': 'https://gitlab.com/CentOS/artwork/centos-brand/-/raw/main/Sources/centos-symbol.svg',
             'color': '#932279'
         },
         'debian': {
