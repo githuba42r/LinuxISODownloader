@@ -49,7 +49,7 @@ The container accepts the same arguments as the Python script:
 | Argument | Short | Description |
 |----------|-------|-------------|
 | `--dry-run` | `-n` | Show what would be done without making changes |
-| `--distro <name>` | `-d <name>` | Update specific distro (centos, debian, ubuntu, arch, all) |
+| `--distro <name>` | `-d <name>` | Update specific distro (centos, debian, ubuntu, arch, raspberrypi, mint, fedora, popos, rocky, alma, manjaro, elementary, zorin, endeavour, all) |
 
 **Examples:**
 

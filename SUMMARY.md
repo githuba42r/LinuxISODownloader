@@ -8,7 +8,7 @@ This project automates the management of Linux distribution ISO torrents on a Tr
 
 ### 1. Core Application (`linux_iso_torrent_updater.py`)
 - Python script that finds and manages Linux ISO torrents
-- Supports: CentOS Stream, Debian, Ubuntu, Arch Linux
+- Supports 14 distributions: CentOS Stream, Debian, Ubuntu, Arch Linux, Raspberry Pi OS, Linux Mint, Fedora Workstation, Pop!_OS, Rocky Linux, AlmaLinux, Manjaro, elementary OS, Zorin OS, EndeavourOS
 - Uses web scraping to find latest torrent URLs
 - Integrates with Transmission via RPC API
 - Intelligent version detection to avoid duplicate downloads
@@ -49,12 +49,22 @@ This project automates the management of Linux distribution ISO torrents on a Tr
 
 ## Supported Distributions
 
-| Distribution | Version | Type |
-|-------------|---------|------|
-| CentOS | Stream 9 | DVD ISO |
-| Debian | Latest Stable | DVD-1 amd64 |
-| Ubuntu | Latest LTS | Desktop amd64 |
-| Arch Linux | Latest Rolling | ISO |
+| Distribution | Version | Type | Source |
+|-------------|---------|------|--------|
+| CentOS | Stream 9 | DVD ISO | LinuxTracker.org |
+| Debian | Latest Stable | DVD-1 amd64 | Official CDImage |
+| Ubuntu | Latest LTS | Desktop amd64 | Official Releases |
+| Arch Linux | Latest Rolling | ISO | Official Server |
+| Raspberry Pi OS | Latest | arm64 | Official Downloads |
+| Linux Mint | Latest Cinnamon | x64 | LinuxTracker.org |
+| Fedora | Workstation Latest | Live x64 | Official Torrents |
+| Pop!_OS | Latest LTS | x64 | LinuxTracker.org |
+| Rocky Linux | Latest | DVD x64 | LinuxTracker.org |
+| AlmaLinux | Latest | DVD x64 | LinuxTracker.org |
+| Manjaro | Latest KDE | Full | LinuxTracker.org |
+| elementary OS | Latest Stable | x64 | LinuxTracker.org |
+| Zorin OS | Latest Core | x64 | LinuxTracker.org |
+| EndeavourOS | Latest | x64 | LinuxTracker.org |
 
 ## Architecture
 

@@ -1,17 +1,26 @@
 # Linux ISO Torrent Updater
 
-A Python application that automatically manages torrent files for the latest Linux distribution ISO images on a Transmission server. It tracks CentOS Stream, Debian, Ubuntu, Arch Linux, and Raspberry Pi OS releases, removing old torrents and adding new ones as they become available.
+A Python application that automatically manages torrent files for the latest Linux distribution ISO images on a Transmission server. It tracks 14 popular Linux distributions, automatically removing old torrents and adding new ones as they become available.
 
 ## Features
 
 - **Web Interface**: User-friendly web UI for managing torrent updates (port 8084)
 - **CLI Mode**: Command-line interface for automation and scripting
-- Automatically detects the latest ISO torrents for:
-  - CentOS Stream 9 (via LinuxTracker.org)
-  - Debian (latest stable DVD)
-  - Ubuntu (latest LTS desktop)
-  - Arch Linux (latest release)
-  - Raspberry Pi OS (latest arm64 release)
+- Automatically detects the latest ISO torrents for 14 distributions:
+  - **CentOS Stream 9** (via LinuxTracker.org)
+  - **Debian** (latest stable DVD)
+  - **Ubuntu** (latest LTS desktop)
+  - **Arch Linux** (latest release)
+  - **Raspberry Pi OS** (latest arm64 release)
+  - **Linux Mint** (latest Cinnamon edition)
+  - **Fedora Workstation** (latest official release)
+  - **Pop!_OS** (latest LTS)
+  - **Rocky Linux** (latest DVD)
+  - **AlmaLinux** (latest DVD)
+  - **Manjaro** (latest KDE edition)
+  - **elementary OS** (latest stable)
+  - **Zorin OS** (latest Core edition)
+  - **EndeavourOS** (latest release)
 - Removes old torrents and their files when updates are available
 - Integrates with Transmission via RPC
 - Runs periodically via systemd timer
@@ -107,7 +116,7 @@ TRANSMISSION_PASS=your_password
 
 # Optional: Configure automatic scheduling (for web interface)
 SCHEDULE_TIME=02:00                                  # Check daily at 2am
-SCHEDULE_DISTROS=debian,ubuntu,arch,raspberrypi      # Distros to check
+SELECT_DISTROS=debian,ubuntu,arch,raspberrypi        # Distros selected by default in web UI
 ```
 
 ### 3. Run the Application
@@ -347,7 +356,9 @@ Access the web interface at http://localhost:8084
 - View download progress, speeds, and ratios
 - Manual update checking with progress tracking
 - Responsive design for mobile devices
-- Visual status indicators and progress bars
+- Visual status indicators and progress bars with hover effects
+- ETA (estimated time remaining) display for active downloads
+- Progress percentage tooltips on hover
 - **Automatic scheduled checks** - runs daily at configured time (default: 2am)
 
 **Web Interface Command-Line Options:**
@@ -363,7 +374,7 @@ python web_interface.py --host 0.0.0.0 --port 8084
 python web_interface.py --debug
 
 # Configure automatic scheduling
-python web_interface.py --schedule-time 02:00 --schedule-distros debian,ubuntu,arch
+python web_interface.py --schedule-time 02:00 --select-distros debian,ubuntu,arch
 
 # Disable automatic scheduling
 python web_interface.py --schedule-time disabled
@@ -377,7 +388,7 @@ python web_interface.py --log-file ~/logs/web-interface.log
 - `--port`: Port to bind to (default: 8084)
 - `--debug`: Enable Flask debug mode
 - `--schedule-time`: Time for automatic checks in HH:MM format (default: 02:00)
-- `--schedule-distros`: Distributions for scheduled checks (default: all)
+- `--select-distros`: Distributions selected by default in web UI (comma-separated)
 - `--log-file`, `-l`: Path to log file (default: console only)
 
 ### Automatic Scheduling (Web Interface)
@@ -389,13 +400,13 @@ When running the web interface, you can configure automatic torrent checks:
 ```bash
 # In .env file
 SCHEDULE_TIME=02:00                                  # Check daily at 2am
-SCHEDULE_DISTROS=debian,ubuntu,arch,raspberrypi      # Distros to check
+SELECT_DISTROS=debian,ubuntu,arch,raspberrypi        # Distros selected by default in web UI
 ```
 
 **Via Command-Line Arguments**:
 
 ```bash
-python web_interface.py --schedule-time 14:30 --schedule-distros debian,ubuntu
+python web_interface.py --schedule-time 14:30 --select-distros debian,ubuntu
 ```
 
 **Via Docker Environment**:
@@ -405,7 +416,7 @@ docker run -d \
   -p 8084:8084 \
   --env-file .env \
   -e SCHEDULE_TIME=02:00 \
-  -e SCHEDULE_DISTROS=debian,ubuntu,arch \
+  -e SELECT_DISTROS=debian,ubuntu,arch \
   linux-iso-updater:latest --web
 ```
 
@@ -413,8 +424,8 @@ docker run -d \
 - Time format: `HH:MM` in 24-hour format (e.g., `02:00` for 2am, `14:30` for 2:30pm)
 - Default time: `02:00` (2am local time)
 - To disable: Set `SCHEDULE_TIME=disabled` or `--schedule-time disabled`
-- Distributions: Comma-separated list of distros to check
-- Default distros: All configured distributions
+- Distributions: Comma-separated list of distributions to select by default in web UI
+- Default distros: debian,ubuntu,arch,centos,raspberrypi,mint,fedora,popos,rocky,alma,manjaro,elementary,zorin,endeavour
 
 The scheduler runs in the background and automatically checks for new torrents at the specified time each day.
 
@@ -456,7 +467,7 @@ LOG_FILE=~/logs/iso-updater.log python linux_iso_torrent_updater.py
 
 **Available options:**
 - `--dry-run`, `-n`: Show what would be done without making any changes to Transmission
-- `--distro`, `-d <name>`: Update specific distribution (choices: centos, debian, ubuntu, arch, raspberrypi) - overrides config
+- `--distro`, `-d <name>`: Update specific distribution (choices: centos, debian, ubuntu, arch, raspberrypi, mint, fedora, popos, rocky, alma, manjaro, elementary, zorin, endeavour) - overrides config
 - `--distros <list>`: Comma-separated list of distributions - overrides config
 - `--log-file`, `-l <path>`: Path to log file (default: console only)
 
@@ -1121,12 +1132,21 @@ The script searches for torrents from various sources:
 - **Ubuntu**: Official Ubuntu releases
 - **Arch Linux**: Official Arch Linux servers
 - **Raspberry Pi OS**: Official Raspberry Pi downloads
+- **Linux Mint**: LinuxTracker.org (community mirror)
+- **Fedora Workstation**: Official Fedora torrent servers
+- **Pop!_OS**: LinuxTracker.org (community mirror)
+- **Rocky Linux**: LinuxTracker.org (community mirror)
+- **AlmaLinux**: LinuxTracker.org (community mirror)
+- **Manjaro**: LinuxTracker.org (community mirror)
+- **elementary OS**: LinuxTracker.org (community mirror)
+- **Zorin OS**: LinuxTracker.org (community mirror)
+- **EndeavourOS**: LinuxTracker.org (community mirror)
 
 If a torrent cannot be found:
 
 1. Check logs for specific errors
 2. Verify the source is accessible (some distributions may temporarily remove torrents)
-3. For CentOS: LinuxTracker.org may be temporarily down or the page structure may have changed
+3. For CentOS, Mint, Pop!_OS, Rocky, AlmaLinux, Manjaro, elementary, Zorin, and EndeavourOS: LinuxTracker.org may be temporarily down or the page structure may have changed
 4. Try the `--dry-run` flag to see what's happening without making changes
 
 **CentOS Note:** CentOS Stream no longer provides official torrent files. This script uses LinuxTracker.org as a community-maintained source. If LinuxTracker is unavailable, CentOS torrents won't be found.
@@ -1142,6 +1162,15 @@ python linux_iso_torrent_updater.py --dry-run --distro centos
 python linux_iso_torrent_updater.py --dry-run --distro ubuntu
 python linux_iso_torrent_updater.py --dry-run --distro arch
 python linux_iso_torrent_updater.py --dry-run --distro raspberrypi
+python linux_iso_torrent_updater.py --dry-run --distro mint
+python linux_iso_torrent_updater.py --dry-run --distro fedora
+python linux_iso_torrent_updater.py --dry-run --distro popos
+python linux_iso_torrent_updater.py --dry-run --distro rocky
+python linux_iso_torrent_updater.py --dry-run --distro alma
+python linux_iso_torrent_updater.py --dry-run --distro manjaro
+python linux_iso_torrent_updater.py --dry-run --distro elementary
+python linux_iso_torrent_updater.py --dry-run --distro zorin
+python linux_iso_torrent_updater.py --dry-run --distro endeavour
 ```
 
 ## Uninstallation

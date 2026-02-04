@@ -297,6 +297,8 @@ Create `.vscode/settings.json`:
 | `TRANSMISSION_PORT` | Yes | `9091` | Transmission RPC port |
 | `TRANSMISSION_USER` | Yes | - | Transmission username |
 | `TRANSMISSION_PASS` | Yes | - | Transmission password |
+| `SCHEDULE_TIME` | No | `02:00` | Time for automatic checks (web interface only, HH:MM format) |
+| `SELECT_DISTROS` | No | All 14 distros | Comma-separated list of distros to select by default in web UI |
 | `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
 
 ## Quick Reference

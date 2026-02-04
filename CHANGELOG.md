@@ -4,6 +4,37 @@ All notable changes to the Linux ISO Torrent Updater project.
 
 ## [Unreleased]
 
+### Added - Additional Distributions Support (2026-02-04)
+
+- **9 New Linux Distributions**
+  - Linux Mint (Cinnamon edition via LinuxTracker.org)
+  - Fedora Workstation (official torrents)
+  - Pop!_OS (LTS via LinuxTracker.org)
+  - Rocky Linux (DVD via LinuxTracker.org)
+  - AlmaLinux (DVD via LinuxTracker.org)
+  - Manjaro (KDE edition via LinuxTracker.org)
+  - elementary OS (stable via LinuxTracker.org)
+  - Zorin OS (Core edition via LinuxTracker.org)
+  - EndeavourOS (via LinuxTracker.org)
+  - Total: 14 distributions now supported
+
+- **Web Interface Enhancements**
+  - Progress bar hover effects with lift animation and shadow
+  - ETA (estimated time remaining) display for active downloads
+  - Progress percentage tooltips on hover
+  - Visual polish and improved UX
+
+- **Bug Fixes**
+  - Fixed torrent status showing "Unknown" by mapping status strings to integer codes
+  - Fixed progress bars showing >100% by properly converting percentages
+  - Fixed Rocky Linux finder (search query too specific)
+  - Fixed Manjaro finder (removed incorrect x86_64 requirement)
+
+- **Configuration Changes**
+  - Renamed `SCHEDULE_DISTROS` to `SELECT_DISTROS` for clarity
+  - Variable now controls default selections in web UI
+  - Fixed global `scheduled_distros` initialization bug
+
 ### Added - Dry-Run Feature (2026-02-04)
 
 - **Dry-run mode** (`--dry-run` / `-n` flag)
