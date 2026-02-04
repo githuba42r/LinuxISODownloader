@@ -400,7 +400,7 @@ class RockyLinuxTorrentFinder(DistroTorrentFinder):
     
     def __init__(self):
         super().__init__("Rocky Linux")
-        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=rocky+linux&order=3&by=2"
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=rocky&order=3&by=2"
         
     def get_latest_torrent_url(self) -> Optional[str]:
         try:
@@ -411,14 +411,14 @@ class RockyLinuxTorrentFinder(DistroTorrentFinder):
             
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Look for Rocky Linux x86_64 DVD torrent
+            # Look for Rocky x86_64 DVD torrent (format: Rocky-10.1-x86_64-dvd1)
             for link in soup.find_all('a', href=True):
                 href = str(link['href'])
                 title = str(link.get('title', ''))
                 
                 if ('rocky' in title.lower() and 
                     'x86_64' in title.lower() and
-                    ('dvd' in title.lower() or 'dvd1' in title.lower()) and
+                    'dvd' in title.lower() and
                     'torrent-details' in href):
                     
                     if 'id=' in href:
@@ -487,14 +487,16 @@ class ManjaroTorrentFinder(DistroTorrentFinder):
             
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Look for Manjaro KDE x86_64 torrent (most popular edition)
+            # Look for Manjaro KDE torrent (most popular edition)
+            # Note: Manjaro ISOs don't include architecture in the name
             for link in soup.find_all('a', href=True):
                 href = str(link['href'])
                 title = str(link.get('title', ''))
                 
                 if ('manjaro' in title.lower() and 
                     'kde' in title.lower() and
-                    'x86_64' in title.lower() and
+                    'minimal' not in title.lower() and
+                    'rc' not in title.lower() and
                     'torrent-details' in href):
                     
                     if 'id=' in href:
