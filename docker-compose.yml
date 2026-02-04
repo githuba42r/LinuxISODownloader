@@ -23,6 +23,8 @@ services:
       - TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091}
       - TRANSMISSION_USER=${TRANSMISSION_USER}
       - TRANSMISSION_PASS=${TRANSMISSION_PASS}
+      - SCHEDULE_TIME=${SCHEDULE_TIME:-02:00}
+      - SCHEDULE_DISTROS=${SCHEDULE_DISTROS:-debian,ubuntu,arch,raspberrypi}
     
     # Start in web mode
     command: ["--web"]

@@ -10,13 +10,15 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, time as datetime_time
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from flask import Flask, render_template, jsonify, request
 import transmission_rpc
 from dotenv import load_dotenv
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Import the torrent manager from the main script
 sys.path.insert(0, str(Path(__file__).parent))
@@ -38,6 +40,8 @@ last_check_time: Optional[datetime] = None
 last_check_results: Dict[str, Dict] = {}
 check_in_progress = False
 check_lock = threading.Lock()
+scheduler: Optional[BackgroundScheduler] = None
+scheduled_distros: List[str] = []
 
 # Setup logging
 logger = setup_logging()
@@ -196,6 +200,77 @@ def update_distro(distro: str) -> Dict:
         }
 
 
+def scheduled_check():
+    """Perform scheduled torrent update check."""
+    global scheduled_distros
+    
+    logger.info(f"Running scheduled torrent check for: {', '.join(scheduled_distros)}")
+    
+    if not scheduled_distros:
+        logger.warning("No distributions configured for scheduled checks")
+        return
+    
+    try:
+        # Run the actual update (not just check)
+        for distro in scheduled_distros:
+            try:
+                logger.info(f"Scheduled update for {distro}...")
+                manager.update_torrent(distro)
+            except Exception as e:
+                logger.error(f"Scheduled update failed for {distro}: {e}")
+        
+        logger.info("Scheduled torrent check completed")
+    except Exception as e:
+        logger.error(f"Error in scheduled check: {e}")
+
+
+def setup_scheduler(schedule_time: str, distros: List[str]) -> bool:
+    """
+    Set up the background scheduler for automatic torrent checks.
+    
+    Args:
+        schedule_time: Time in HH:MM format (24-hour) or 'disabled'
+        distros: List of distributions to check
+    
+    Returns:
+        True if scheduler was set up successfully
+    """
+    global scheduler, scheduled_distros
+    
+    # Disable scheduler if requested
+    if schedule_time.lower() == 'disabled' or not schedule_time:
+        logger.info("Automatic scheduling disabled")
+        return True
+    
+    # Parse the time
+    try:
+        hour, minute = map(int, schedule_time.split(':'))
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError("Invalid time range")
+    except (ValueError, AttributeError) as e:
+        logger.error(f"Invalid schedule time format '{schedule_time}'. Use HH:MM (24-hour) or 'disabled'. Error: {e}")
+        return False
+    
+    scheduled_distros = distros if distros else ['debian', 'ubuntu', 'arch', 'raspberrypi']
+    
+    # Create scheduler
+    scheduler = BackgroundScheduler()
+    
+    # Add job to run daily at specified time
+    scheduler.add_job(
+        scheduled_check,
+        trigger=CronTrigger(hour=hour, minute=minute),
+        id='torrent_check',
+        name=f'Daily torrent check at {schedule_time}',
+        replace_existing=True
+    )
+    
+    scheduler.start()
+    logger.info(f"Scheduled automatic torrent checks daily at {schedule_time} for: {', '.join(scheduled_distros)}")
+    
+    return True
+
+
 @app.route('/')
 def index():
     """Main page."""
@@ -284,12 +359,17 @@ def api_config():
 def main():
     """Main entry point for web interface."""
     import argparse
+    import atexit
     
     parser = argparse.ArgumentParser(description='Linux ISO Torrent Updater - Web Interface')
     parser.add_argument('--host', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
     parser.add_argument('--port', type=int, default=8084, help='Port to bind to (default: 8084)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     parser.add_argument('--log-file', '-l', help='Path to log file (default: console only)')
+    parser.add_argument('--schedule-time', default=None, 
+                        help='Time to run automatic checks in HH:MM format (24-hour), e.g., "02:00" for 2am. Use "disabled" to disable scheduling. (default: from env or 02:00)')
+    parser.add_argument('--schedule-distros', default=None,
+                        help='Comma-separated list of distributions for scheduled checks (default: from env or all)')
     
     args = parser.parse_args()
     
@@ -306,11 +386,39 @@ def main():
         logger.error("Failed to initialize torrent manager. Please check your configuration.")
         sys.exit(1)
     
+    # Configure scheduler
+    schedule_time = args.schedule_time or os.environ.get('SCHEDULE_TIME', '02:00')
+    schedule_distros_str = args.schedule_distros or os.environ.get('SCHEDULE_DISTROS', 'debian,ubuntu,arch,raspberrypi')
+    
+    if schedule_distros_str and schedule_distros_str.lower() != 'disabled':
+        schedule_distros = [d.strip() for d in schedule_distros_str.split(',')]
+    else:
+        schedule_distros = []
+    
+    # Setup scheduler if enabled
+    if schedule_time.lower() != 'disabled':
+        if not setup_scheduler(schedule_time, schedule_distros):
+            logger.warning("Failed to setup scheduler, continuing without automatic checks")
+    else:
+        logger.info("Automatic scheduling disabled")
+    
+    # Register cleanup on exit
+    def cleanup():
+        global scheduler
+        if scheduler:
+            logger.info("Shutting down scheduler...")
+            scheduler.shutdown()
+    
+    atexit.register(cleanup)
+    
     logger.info(f"Starting web interface on {args.host}:{args.port}")
     logger.info(f"Open http://localhost:{args.port} in your browser")
     
     # Run Flask app
-    app.run(host=args.host, port=args.port, debug=args.debug, threaded=True)
+    try:
+        app.run(host=args.host, port=args.port, debug=args.debug, threaded=True)
+    finally:
+        cleanup()
 
 
 if __name__ == '__main__':

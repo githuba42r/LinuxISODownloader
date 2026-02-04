@@ -104,6 +104,10 @@ TRANSMISSION_HOST=localhost
 TRANSMISSION_PORT=9091
 TRANSMISSION_USER=your_username
 TRANSMISSION_PASS=your_password
+
+# Optional: Configure automatic scheduling (for web interface)
+SCHEDULE_TIME=02:00                                  # Check daily at 2am
+SCHEDULE_DISTROS=debian,ubuntu,arch,raspberrypi      # Distros to check
 ```
 
 ### 3. Run the Application
@@ -134,6 +138,7 @@ The web interface provides:
 - Manual update checking
 - Auto-refresh every 5 seconds
 - Progress tracking with visual indicators
+- **Automatic scheduled checks** (default: daily at 2am local time)
 
 #### CLI Mode (For Automation)
 
@@ -343,6 +348,75 @@ Access the web interface at http://localhost:8084
 - Manual update checking with progress tracking
 - Responsive design for mobile devices
 - Visual status indicators and progress bars
+- **Automatic scheduled checks** - runs daily at configured time (default: 2am)
+
+**Web Interface Command-Line Options:**
+
+```bash
+# Basic usage
+python web_interface.py
+
+# Custom host and port
+python web_interface.py --host 0.0.0.0 --port 8084
+
+# With debug mode
+python web_interface.py --debug
+
+# Configure automatic scheduling
+python web_interface.py --schedule-time 02:00 --schedule-distros debian,ubuntu,arch
+
+# Disable automatic scheduling
+python web_interface.py --schedule-time disabled
+
+# With log file
+python web_interface.py --log-file ~/logs/web-interface.log
+```
+
+**Available web interface options:**
+- `--host`: Host to bind to (default: 0.0.0.0)
+- `--port`: Port to bind to (default: 8084)
+- `--debug`: Enable Flask debug mode
+- `--schedule-time`: Time for automatic checks in HH:MM format (default: 02:00)
+- `--schedule-distros`: Distributions for scheduled checks (default: all)
+- `--log-file`, `-l`: Path to log file (default: console only)
+
+### Automatic Scheduling (Web Interface)
+
+When running the web interface, you can configure automatic torrent checks:
+
+**Via Environment Variables** (recommended):
+
+```bash
+# In .env file
+SCHEDULE_TIME=02:00                                  # Check daily at 2am
+SCHEDULE_DISTROS=debian,ubuntu,arch,raspberrypi      # Distros to check
+```
+
+**Via Command-Line Arguments**:
+
+```bash
+python web_interface.py --schedule-time 14:30 --schedule-distros debian,ubuntu
+```
+
+**Via Docker Environment**:
+
+```bash
+docker run -d \
+  -p 8084:8084 \
+  --env-file .env \
+  -e SCHEDULE_TIME=02:00 \
+  -e SCHEDULE_DISTROS=debian,ubuntu,arch \
+  linux-iso-updater:latest --web
+```
+
+**Scheduling Options:**
+- Time format: `HH:MM` in 24-hour format (e.g., `02:00` for 2am, `14:30` for 2:30pm)
+- Default time: `02:00` (2am local time)
+- To disable: Set `SCHEDULE_TIME=disabled` or `--schedule-time disabled`
+- Distributions: Comma-separated list of distros to check
+- Default distros: All configured distributions
+
+The scheduler runs in the background and automatically checks for new torrents at the specified time each day.
 
 ### Command Line Options
 

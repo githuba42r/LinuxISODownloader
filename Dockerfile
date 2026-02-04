@@ -53,7 +53,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Health check (optional - checks if Python can import required modules)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import transmission_rpc; import requests; import bs4; import flask" || exit 1
+    CMD python -c "import transmission_rpc; import requests; import bs4; import flask; import apscheduler" || exit 1
 
 # Expose port for web interface
 EXPOSE 8084
