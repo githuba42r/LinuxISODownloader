@@ -11,22 +11,39 @@ services:
     # Network configuration - use host network to access local Transmission
     network_mode: host
     
-    # Environment variables for Transmission connection
+    # Option 1: Load environment variables from .env file (RECOMMENDED)
+    # Uncomment and create .env file with your credentials:
+    # env_file:
+    #   - .env
+    
+    # Option 2: Specify environment variables directly (for testing/quick runs)
     environment:
       - TRANSMISSION_HOST=${TRANSMISSION_HOST:-localhost}
       - TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091}
       - TRANSMISSION_USER=${TRANSMISSION_USER}
       - TRANSMISSION_PASS=${TRANSMISSION_PASS}
+      - DISTROS=${DISTROS:-debian,ubuntu,arch,raspberrypi}
     
-    # Alternative: Load from .env file
-    # env_file:
-    #   - .env
+    # Option 3: Mount .env files from host (alternative)
+    # volumes:
+    #   - ./.env:/app/.env:ro
+    #   - ./.env.local:/app/.env.local:ro
+    
+    # Option 4: Mount config.json (alternative to .env)
+    # volumes:
+    #   - ~/.config/linux-iso-updater:/root/.config/linux-iso-updater:ro
+    
+    # Option 5: Mount log directory to persist logs on host
+    # volumes:
+    #   - ./logs:/logs
     
     # Command line arguments (uncomment to use)
-    # command: []                    # Default: update all torrents
+    # command: []                    # Default: update all configured torrents
     # command: ["--dry-run"]         # Dry-run mode
-    # command: ["--distro", "debian"] # Update specific distro
+    # command: ["--distro", "debian"] # Update specific distro only
+    # command: ["--distros", "debian,ubuntu,raspberrypi"] # Update multiple distros
     # command: ["--dry-run", "--distro", "ubuntu"] # Dry-run for specific distro
+    # command: ["--log-file", "/logs/updater.log", "--dry-run"] # With logging
     
     # Restart policy (for one-time runs, use 'no'; for daemon mode, use 'unless-stopped')
     restart: "no"
@@ -47,4 +64,22 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+# Example configurations:
+
+# 1. Basic usage with .env file (uncomment to use):
+# docker-compose up
+
+# 2. Dry-run mode:
+# docker-compose run --rm linux-iso-updater --dry-run
+
+# 3. Update specific distro:
+# docker-compose run --rm linux-iso-updater --distro raspberrypi
+
+# 4. Override environment variables:
+# DISTROS=debian,ubuntu docker-compose up
+
+# 5. With logging to host filesystem:
+# Uncomment the volumes section for logs and run:
+# docker-compose run --rm linux-iso-updater --log-file /logs/updater.log
 

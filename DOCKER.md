@@ -149,6 +149,252 @@ docker-compose down
 
 ### Environment Configuration
 
+Docker containers are isolated and don't have access to host files by default. Here's how to pass configuration:
+
+#### Using --env-file (Recommended)
+
+Create a `.env` file and pass it to the container:
+
+```bash
+# Create .env file
+cat > .env <<EOF
+TRANSMISSION_HOST=localhost
+TRANSMISSION_PORT=9091
+TRANSMISSION_USER=myuser
+TRANSMISSION_PASS=mypass
+DISTROS=debian,ubuntu,raspberrypi
+LOG_FILE=/logs/iso-updater.log
+EOF
+
+# Secure the file
+chmod 600 .env
+
+# Run with env file
+docker run --rm --network host --env-file .env \
+  linux-iso-updater:latest --dry-run
+```
+
+#### Using Individual Environment Variables
+
+```bash
+docker run --rm --network host \
+  -e TRANSMISSION_HOST=localhost \
+  -e TRANSMISSION_PORT=9091 \
+  -e TRANSMISSION_USER=myuser \
+  -e TRANSMISSION_PASS=mypass \
+  -e DISTROS=debian,ubuntu \
+  linux-iso-updater:latest --dry-run
+```
+
+#### Mounting .env Files into the Container
+
+Mount a .env file from host into the container:
+
+```bash
+# The script will automatically load .env files from /app/
+docker run --rm --network host \
+  -v "$(pwd)/.env:/app/.env:ro" \
+  linux-iso-updater:latest --dry-run
+
+# Mount .env.local for local overrides
+docker run --rm --network host \
+  -v "$(pwd)/.env:/app/.env:ro" \
+  -v "$(pwd)/.env.local:/app/.env.local:ro" \
+  linux-iso-updater:latest --dry-run
+```
+
+#### Mounting config.json
+
+Use JSON configuration instead of .env:
+
+```bash
+# Create config.json
+mkdir -p ~/.config/linux-iso-updater
+cat > ~/.config/linux-iso-updater/config.json <<EOF
+{
+  "host": "localhost",
+  "port": 9091,
+  "username": "myuser",
+  "password": "mypass",
+  "distros": ["debian", "ubuntu", "raspberrypi"]
+}
+EOF
+
+# Mount config directory into container
+docker run --rm --network host \
+  -v ~/.config/linux-iso-updater:/root/.config/linux-iso-updater:ro \
+  linux-iso-updater:latest --dry-run
+```
+
+#### Logging to Host Filesystem
+
+Write logs to a file on your host:
+
+```bash
+# Create log directory
+mkdir -p ~/logs
+
+# Method 1: Using LOG_FILE environment variable
+docker run --rm --network host \
+  --env-file .env \
+  -e LOG_FILE=/logs/iso-updater.log \
+  -v ~/logs:/logs \
+  linux-iso-updater:latest
+
+# Method 2: Using --log-file argument
+docker run --rm --network host \
+  --env-file .env \
+  -v ~/logs:/logs \
+  linux-iso-updater:latest --log-file /logs/iso-updater.log --dry-run
+
+# View logs on host
+tail -f ~/logs/iso-updater.log
+```
+
+#### Docker Compose Configuration
+
+**Option 1: Using env_file in docker-compose.yml**
+
+```yaml
+version: '3.8'
+services:
+  linux-iso-updater:
+    image: linux-iso-updater:latest
+    network_mode: host
+    env_file:
+      - .env
+    # Optional: override specific variables
+    environment:
+      - DISTROS=debian,ubuntu,raspberrypi
+```
+
+**Option 2: Using volumes for .env files**
+
+```yaml
+version: '3.8'
+services:
+  linux-iso-updater:
+    image: linux-iso-updater:latest
+    network_mode: host
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./.env.local:/app/.env.local:ro
+```
+
+**Option 3: Using volumes for config.json**
+
+```yaml
+version: '3.8'
+services:
+  linux-iso-updater:
+    image: linux-iso-updater:latest
+    network_mode: host
+    volumes:
+      - ~/.config/linux-iso-updater:/root/.config/linux-iso-updater:ro
+```
+
+**Option 4: With logging to host**
+
+```yaml
+version: '3.8'
+services:
+  linux-iso-updater:
+    image: linux-iso-updater:latest
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      - LOG_FILE=/logs/iso-updater.log
+    volumes:
+      - ./logs:/logs
+    command: ["--dry-run"]
+```
+
+#### Configuration Priority
+
+When multiple configuration sources are present:
+
+1. **Command-line arguments** (highest priority)
+   - `--distro debian`
+   - `--log-file /logs/file.log`
+
+2. **Environment variables from `-e`**
+   - `docker run -e DISTROS=debian`
+
+3. **Environment variables from `--env-file`**
+   - `docker run --env-file .env`
+
+4. **Mounted `.env` files in container**
+   - Priority: `.env.local` → `.env.development` → `.env`
+
+5. **Mounted `config.json`**
+   - `~/.config/linux-iso-updater/config.json`
+
+6. **Default values** (lowest priority)
+
+#### Security Best Practices
+
+```bash
+# ✅ DO: Use read-only mounts for sensitive files
+docker run --rm --network host \
+  -v "$(pwd)/.env:/app/.env:ro" \
+  linux-iso-updater:latest
+
+# ✅ DO: Restrict file permissions
+chmod 600 .env
+chmod 600 ~/.config/linux-iso-updater/config.json
+
+# ✅ DO: Use a separate credentials file for Docker
+cp .env.example .env.docker
+nano .env.docker
+docker run --rm --network host --env-file .env.docker linux-iso-updater:latest
+
+# ❌ DON'T: Commit .env files with real credentials
+# ❌ DON'T: Use world-readable permissions
+# ❌ DON'T: Include credentials in docker-compose.yml
+```
+
+#### Complete Example: Production Setup
+
+```bash
+# 1. Create secure credentials file
+sudo mkdir -p /etc/linux-iso-updater
+sudo cat > /etc/linux-iso-updater/credentials.env <<EOF
+TRANSMISSION_HOST=localhost
+TRANSMISSION_PORT=9091
+TRANSMISSION_USER=transmission_user
+TRANSMISSION_PASS=secure_password_here
+DISTROS=debian,ubuntu,arch,raspberrypi
+EOF
+sudo chmod 600 /etc/linux-iso-updater/credentials.env
+sudo chown root:root /etc/linux-iso-updater/credentials.env
+
+# 2. Create log directory
+sudo mkdir -p /var/log/linux-iso-updater
+sudo chmod 755 /var/log/linux-iso-updater
+
+# 3. Test with dry-run
+sudo docker run --rm \
+  --network host \
+  --env-file /etc/linux-iso-updater/credentials.env \
+  -v /var/log/linux-iso-updater:/logs \
+  -e LOG_FILE=/logs/updater.log \
+  linux-iso-updater:latest --dry-run
+
+# 4. Run for real
+sudo docker run --rm \
+  --network host \
+  --env-file /etc/linux-iso-updater/credentials.env \
+  -v /var/log/linux-iso-updater:/logs \
+  -e LOG_FILE=/logs/updater.log \
+  linux-iso-updater:latest
+
+# 5. Check logs
+sudo tail -f /var/log/linux-iso-updater/updater.log
+```
+
+### Environment Configuration
+
 The project supports multiple `.env` files for different environments:
 
 #### For Development

@@ -386,6 +386,154 @@ docker run --rm \
 docker-compose up
 ```
 
+#### Passing Configuration to Docker Containers
+
+Docker containers don't have access to your host's files by default. Here are the methods to pass configuration:
+
+##### Method 1: Using --env-file (Recommended)
+
+The `--env-file` flag reads environment variables from a file on your host:
+
+```bash
+# Create a .env file with your credentials (if you haven't already)
+cat > .env <<EOF
+TRANSMISSION_HOST=localhost
+TRANSMISSION_PORT=9091
+TRANSMISSION_USER=myuser
+TRANSMISSION_PASS=mypass
+DISTROS=debian,ubuntu,raspberrypi
+EOF
+
+# Run with --env-file
+docker run --rm \
+  --network host \
+  --env-file .env \
+  linux-iso-updater:latest --dry-run
+
+# You can use any .env file location
+docker run --rm \
+  --network host \
+  --env-file /etc/linux-iso-updater/credentials.env \
+  linux-iso-updater:latest
+```
+
+##### Method 2: Using -e for Individual Variables
+
+Pass environment variables individually:
+
+```bash
+docker run --rm \
+  --network host \
+  -e TRANSMISSION_HOST=localhost \
+  -e TRANSMISSION_PORT=9091 \
+  -e TRANSMISSION_USER=myuser \
+  -e TRANSMISSION_PASS=mypass \
+  -e DISTROS=debian,ubuntu \
+  linux-iso-updater:latest --dry-run
+```
+
+##### Method 3: Using Volume Mounts for .env Files
+
+Mount a .env file from your host into the container:
+
+```bash
+# Mount .env file to /app/.env inside container
+docker run --rm \
+  --network host \
+  -v "$(pwd)/.env:/app/.env:ro" \
+  linux-iso-updater:latest --dry-run
+
+# The script will automatically load /app/.env if it exists
+```
+
+##### Method 4: Using Volume Mounts for config.json
+
+If you prefer config.json over .env files:
+
+```bash
+# Create config file
+mkdir -p ~/.config/linux-iso-updater
+cat > ~/.config/linux-iso-updater/config.json <<EOF
+{
+  "host": "localhost",
+  "port": 9091,
+  "username": "myuser",
+  "password": "mypass",
+  "distros": ["debian", "ubuntu", "raspberrypi"]
+}
+EOF
+
+# Mount config directory
+docker run --rm \
+  --network host \
+  -v ~/.config/linux-iso-updater:/root/.config/linux-iso-updater:ro \
+  linux-iso-updater:latest --dry-run
+```
+
+##### Method 5: Docker Compose with env_file
+
+In `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+services:
+  linux-iso-updater:
+    image: linux-iso-updater:latest
+    network_mode: host
+    env_file:
+      - .env                    # Loads .env from project directory
+      # OR
+      - /etc/linux-iso-updater/credentials.env  # System-wide config
+    # Optional: Override or add environment variables
+    environment:
+      - DISTROS=debian,ubuntu
+```
+
+Then run:
+
+```bash
+docker-compose run --rm linux-iso-updater --dry-run
+```
+
+##### Method 6: Using LOG_FILE with Volume Mount
+
+If you want to write logs to a file on the host:
+
+```bash
+# Create log directory on host
+mkdir -p ~/logs
+
+# Run with log file and volume mount
+docker run --rm \
+  --network host \
+  --env-file .env \
+  -v ~/logs:/logs \
+  -e LOG_FILE=/logs/iso-updater.log \
+  linux-iso-updater:latest --dry-run
+
+# Or use --log-file argument
+docker run --rm \
+  --network host \
+  --env-file .env \
+  -v ~/logs:/logs \
+  linux-iso-updater:latest --log-file /logs/iso-updater.log --dry-run
+```
+
+**Security Notes:**
+- Never commit `.env` files with real credentials to version control
+- Use `.env.local` for local development (it's gitignored)
+- Set proper permissions: `chmod 600 .env`
+- Use `:ro` (read-only) flag when mounting sensitive files
+- For production, consider using Docker secrets or environment variables from your orchestration platform
+
+**Priority Order in Docker:**
+1. Command-line arguments (`--distro`, `--log-file`)
+2. Environment variables from `-e` flags
+3. Environment variables from `--env-file`
+4. Mounted `.env` files inside container
+5. Mounted `config.json` files
+6. Default values
+
 #### Rebuilding the Image
 
 After making changes to the script:
