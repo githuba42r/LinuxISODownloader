@@ -1,6 +1,53 @@
 version: '3.8'
 
 services:
+  # Web interface service (for GUI management)
+  web-interface:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: linux-iso-updater:latest
+    container_name: linux-iso-updater-web
+    
+    # Port mapping for web interface
+    ports:
+      - "${WEB_PORT:-8084}:8084"
+    
+    # Network configuration - use host network to access local Transmission
+    # Comment out ports above if using host network
+    # network_mode: host
+    
+    # Environment variables
+    environment:
+      - TRANSMISSION_HOST=${TRANSMISSION_HOST:-localhost}
+      - TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091}
+      - TRANSMISSION_USER=${TRANSMISSION_USER}
+      - TRANSMISSION_PASS=${TRANSMISSION_PASS}
+    
+    # Start in web mode
+    command: ["--web"]
+    
+    # Restart policy for web interface (keep running)
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # CLI service (for one-time or scheduled updates)
   linux-iso-updater:
     build:
       context: .
@@ -67,19 +114,28 @@ services:
 
 # Example configurations:
 
-# 1. Basic usage with .env file (uncomment to use):
-# docker-compose up
+# 1. Start web interface:
+# docker-compose up web-interface
 
-# 2. Dry-run mode:
+# 2. Start web interface in background:
+# docker-compose up -d web-interface
+
+# 3. Basic CLI usage with .env file (uncomment to use):
+# docker-compose up linux-iso-updater
+
+# 4. CLI Dry-run mode:
 # docker-compose run --rm linux-iso-updater --dry-run
 
-# 3. Update specific distro:
+# 5. Update specific distro via CLI:
 # docker-compose run --rm linux-iso-updater --distro raspberrypi
 
-# 4. Override environment variables:
-# DISTROS=debian,ubuntu docker-compose up
+# 6. Override environment variables:
+# DISTROS=debian,ubuntu docker-compose up linux-iso-updater
 
-# 5. With logging to host filesystem:
+# 7. CLI with logging to host filesystem:
 # Uncomment the volumes section for logs and run:
 # docker-compose run --rm linux-iso-updater --log-file /logs/updater.log
+
+# 8. Access web interface:
+# Open http://localhost:8084 in your browser
 

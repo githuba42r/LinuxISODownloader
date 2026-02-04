@@ -1,9 +1,11 @@
 # Linux ISO Torrent Updater
 
-A Python script that automatically manages torrent files for the latest Linux distribution ISO images on a Transmission server. It tracks CentOS Stream, Debian, Ubuntu, Arch Linux, and Raspberry Pi OS releases, removing old torrents and adding new ones as they become available.
+A Python application that automatically manages torrent files for the latest Linux distribution ISO images on a Transmission server. It tracks CentOS Stream, Debian, Ubuntu, Arch Linux, and Raspberry Pi OS releases, removing old torrents and adding new ones as they become available.
 
 ## Features
 
+- **Web Interface**: User-friendly web UI for managing torrent updates (port 8084)
+- **CLI Mode**: Command-line interface for automation and scripting
 - Automatically detects the latest ISO torrents for:
   - CentOS Stream 9 (via LinuxTracker.org)
   - Debian (latest stable DVD)
@@ -14,6 +16,7 @@ A Python script that automatically manages torrent files for the latest Linux di
 - Integrates with Transmission via RPC
 - Runs periodically via systemd timer
 - Comprehensive logging
+- Docker support with multiple configuration methods
 
 **Note:** CentOS Stream no longer provides official torrent files. This script uses LinuxTracker.org as a community source for CentOS torrents.
 
@@ -31,6 +34,40 @@ A Python script that automatically manages torrent files for the latest Linux di
   - `transmission-rpc`
   - `requests`
   - `beautifulsoup4`
+  - `flask` (for web interface)
+  - `python-dotenv`
+
+## Quick Start
+
+### Web Interface (Easiest)
+
+The web interface provides a user-friendly way to manage your Linux ISO torrents:
+
+```bash
+# Using Docker (Recommended)
+docker-compose up -d web-interface
+
+# Or using native Python
+python web_interface.py
+```
+
+Then open http://localhost:8084 in your browser to:
+- Select which distributions to check for updates
+- View current torrent status
+- Trigger manual update checks
+- Monitor download progress in real-time
+
+### CLI Mode (For Automation)
+
+For automated scripts or cron jobs:
+
+```bash
+# Using Docker
+docker-compose run --rm linux-iso-updater --distros debian,ubuntu,arch
+
+# Or using native Python
+python linux_iso_torrent_updater.py --distros debian,ubuntu,arch
+```
 
 ## Installation
 
@@ -69,7 +106,38 @@ TRANSMISSION_USER=your_username
 TRANSMISSION_PASS=your_password
 ```
 
-### 3. Test the Docker Container
+### 3. Run the Application
+
+You can run the application in two modes: **Web Interface** (GUI) or **CLI** (command-line).
+
+#### Web Interface Mode (Recommended for Interactive Use)
+
+Start the web interface to manage torrents through a browser:
+
+```bash
+# Using docker-compose (recommended)
+docker-compose up -d web-interface
+
+# Or using docker run directly
+docker run -d \
+  --name linux-iso-updater-web \
+  -p 8084:8084 \
+  --env-file .env \
+  linux-iso-updater:latest --web
+
+# Access at http://localhost:8084
+```
+
+The web interface provides:
+- Real-time torrent status monitoring
+- Interactive distro selection
+- Manual update checking
+- Auto-refresh every 5 seconds
+- Progress tracking with visual indicators
+
+#### CLI Mode (For Automation)
+
+For one-time runs or scheduled automation:
 
 ```bash
 # Using docker run
@@ -79,7 +147,13 @@ docker run --rm \
   linux-iso-updater:latest
 
 # Or using docker-compose
-docker-compose up
+docker-compose run --rm linux-iso-updater
+
+# With specific distros
+docker-compose run --rm linux-iso-updater --distros debian,ubuntu,arch
+
+# Dry-run mode (no changes)
+docker-compose run --rm linux-iso-updater --dry-run
 ```
 
 ### 4. Install Systemd Units (Docker)
@@ -132,13 +206,13 @@ python -m venv venv
 source venv/bin/activate
 
 # Install dependencies
-pip install transmission-rpc requests beautifulsoup4 python-dotenv
+pip install transmission-rpc requests beautifulsoup4 python-dotenv flask
 ```
 
 Or install system-wide:
 
 ```bash
-pip3 install transmission-rpc requests beautifulsoup4 python-dotenv
+pip3 install transmission-rpc requests beautifulsoup4 python-dotenv flask
 ```
 
 Or using your system package manager:
@@ -239,6 +313,36 @@ sudo systemctl start linux-iso-updater.timer
 ```
 
 ## Usage
+
+This application can be used in two modes:
+
+### Web Interface Mode
+
+The web interface provides an easy-to-use GUI for managing your Linux ISO torrents:
+
+```bash
+# Using Docker (recommended)
+docker-compose up -d web-interface
+
+# Or native Python
+python web_interface.py
+
+# With custom host/port
+python web_interface.py --host 0.0.0.0 --port 8084
+
+# With debug mode (for development)
+python web_interface.py --debug
+```
+
+Access the web interface at http://localhost:8084
+
+**Web Interface Features:**
+- Real-time torrent status with auto-refresh (5 seconds)
+- Select distributions to check for updates
+- View download progress, speeds, and ratios
+- Manual update checking with progress tracking
+- Responsive design for mobile devices
+- Visual status indicators and progress bars
 
 ### Command Line Options
 

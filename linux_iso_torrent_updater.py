@@ -456,9 +456,10 @@ def load_dotenv_files():
         if env_file.exists():
             load_dotenv(env_file, override=True)
             loaded_files.append(str(env_file))
-            logger.debug(f"Loaded environment from: {env_file}")
+            if logger:
+                logger.debug(f"Loaded environment from: {env_file}")
     
-    if loaded_files:
+    if loaded_files and logger:
         logger.info(f"Loaded {len(loaded_files)} .env file(s): {', '.join([Path(f).name for f in loaded_files])}")
     
     return loaded_files

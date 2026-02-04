@@ -30,12 +30,16 @@ RUN python -m venv /opt/venv && \
 
 # Copy application files
 COPY linux_iso_torrent_updater.py .
+COPY web_interface.py .
+COPY templates/ templates/
+COPY static/ static/
+COPY entrypoint.sh .
 
 # Note: Environment variables should be provided via docker run -e or --env-file
 # The .env files are not copied into the image for security reasons
 
-# Ensure script is executable
-RUN chmod +x linux_iso_torrent_updater.py
+# Ensure scripts are executable
+RUN chmod +x linux_iso_torrent_updater.py web_interface.py entrypoint.sh
 
 # Create a non-root user to run the application
 RUN useradd -m -u 1000 -s /bin/bash appuser && \
@@ -49,9 +53,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Health check (optional - checks if Python can import required modules)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import transmission_rpc; import requests; import bs4" || exit 1
+    CMD python -c "import transmission_rpc; import requests; import bs4; import flask" || exit 1
+
+# Expose port for web interface
+EXPOSE 8084
 
 # Run the script
 # Use ENTRYPOINT with CMD to allow passing arguments
-ENTRYPOINT ["/opt/venv/bin/python", "/app/linux_iso_torrent_updater.py"]
+# For web mode: docker run ... --web
+# For CLI mode: docker run ... --distro ubuntu
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD []
