@@ -269,16 +269,45 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                         results[distro] = result
                         broadcast_event('check_result', f'Error checking {distro}: {str(e)}', {'distro': distro, 'result': result})
                 else:
-                    # No existing torrent - this is a new one
-                    result = {
-                        'success': True,
-                        'url': torrent_url,
-                        'status': 'new',
-                        'message': 'New torrent available (not currently in Transmission)',
-                        'checked_at': datetime.now().isoformat()
-                    }
-                    results[distro] = result
-                    broadcast_event('check_result', f'New torrent available for {distro}', {'distro': distro, 'result': result})
+                    # No existing torrent - this is a new one, add it to Transmission
+                    try:
+                        import requests
+                        response = requests.get(torrent_url, timeout=30)
+                        if response.status_code != 200:
+                            result = {
+                                'success': False,
+                                'error': f'Failed to download torrent from {torrent_url}',
+                                'status': 'error'
+                            }
+                            results[distro] = result
+                            broadcast_event('check_result', f'Error downloading torrent for {distro}', {'distro': distro, 'result': result})
+                            continue
+                        
+                        new_torrent_data = response.content
+                        
+                        # Add the new torrent to Transmission
+                        new_torrent = manager.client.add_torrent(new_torrent_data)
+                        
+                        result = {
+                            'success': True,
+                            'url': torrent_url,
+                            'torrent_name': new_torrent.name,
+                            'status': 'added',
+                            'message': f'New torrent added: {new_torrent.name}',
+                            'checked_at': datetime.now().isoformat()
+                        }
+                        results[distro] = result
+                        broadcast_event('check_result', f'Added new torrent for {distro}: {new_torrent.name}', {'distro': distro, 'result': result})
+                        
+                    except Exception as e:
+                        logger.error(f"Error adding new torrent for {distro}: {e}")
+                        result = {
+                            'success': False,
+                            'error': f'Failed to add torrent: {str(e)}',
+                            'status': 'error'
+                        }
+                        results[distro] = result
+                        broadcast_event('check_result', f'Error adding torrent for {distro}: {str(e)}', {'distro': distro, 'result': result})
                     
             except Exception as e:
                 logger.error(f"Error checking {distro}: {e}")

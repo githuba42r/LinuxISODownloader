@@ -79,7 +79,7 @@ function handleServerEvent(event) {
             let eventType = 'info';
             if (result.status === 'error') {
                 eventType = 'error';
-            } else if (result.status === 'update_available' || result.status === 'new') {
+            } else if (result.status === 'update_available' || result.status === 'new' || result.status === 'added') {
                 eventType = 'success';
             }
             
