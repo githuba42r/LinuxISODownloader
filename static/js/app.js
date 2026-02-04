@@ -4,6 +4,7 @@ let autoRefreshInterval = null;
 let statusCheckInterval = null;
 let eventHistory = []; // Store last 200 events
 const MAX_EVENTS = 200;
+let eventSource = null; // SSE connection
 
 // Initialize the app when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -11,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDistros();
     updateStatus();
     startAutoRefresh();
+    connectEventStream();
     
     // Set up event listeners
     document.getElementById('select-all-btn').addEventListener('click', selectAllDistros);
@@ -30,6 +32,69 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Connect to Server-Sent Events stream
+function connectEventStream() {
+    if (eventSource) {
+        eventSource.close();
+    }
+    
+    eventSource = new EventSource('/api/events');
+    
+    eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        handleServerEvent(data);
+    };
+    
+    eventSource.onerror = function(error) {
+        console.error('EventSource error:', error);
+        // Attempt reconnection after 5 seconds
+        setTimeout(() => {
+            if (eventSource.readyState === EventSource.CLOSED) {
+                connectEventStream();
+            }
+        }, 5000);
+    };
+}
+
+// Handle events from server
+function handleServerEvent(event) {
+    const { type, message, data } = event;
+    
+    switch (type) {
+        case 'connected':
+            console.log('Connected to event stream');
+            break;
+            
+        case 'check_start':
+            // Distro check starting
+            console.log(`Check starting: ${message}`);
+            break;
+            
+        case 'check_result':
+            // Individual distro result
+            const result = data.result;
+            const distro = data.distro;
+            
+            let eventType = 'info';
+            if (result.status === 'error') {
+                eventType = 'error';
+            } else if (result.status === 'update_available' || result.status === 'new') {
+                eventType = 'success';
+            }
+            
+            addEvent(`${formatDistroName(distro)}: ${message}`, eventType);
+            renderEvents();
+            break;
+            
+        case 'check_complete':
+            // All checks complete
+            checkInProgress = false;
+            resetCheckButton();
+            updateStatus();
+            break;
+    }
+}
 
 // Load configuration and set up Transmission button
 async function loadConfig() {
@@ -230,8 +295,10 @@ async function checkForUpdates() {
         return;
     }
     
-    // Clear previous results
-    document.getElementById('results-container').innerHTML = '';
+    // Add event for check start
+    const distroNames = selectedDistros.map(id => formatDistroName(id)).join(', ');
+    addEvent(`Checking for updates: ${distroNames}`, 'info');
+    renderEvents();
     
     // Disable button and show spinner
     const btn = document.getElementById('check-updates-btn');
@@ -260,8 +327,7 @@ async function checkForUpdates() {
             return;
         }
         
-        // Start polling for status (status badge will show in-progress state)
-        startStatusCheck();
+        // SSE will handle real-time updates, no need to poll
         
     } catch (error) {
         console.error('Error checking for updates:', error);
@@ -269,119 +335,6 @@ async function checkForUpdates() {
         checkInProgress = false;
         resetCheckButton();
     }
-}
-
-// Start polling for check status
-function startStatusCheck() {
-    if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
-    }
-    
-    statusCheckInterval = setInterval(async () => {
-        try {
-            const response = await fetch('/api/check/status');
-            const data = await response.json();
-            
-            if (data.status === 'completed') {
-                clearInterval(statusCheckInterval);
-                statusCheckInterval = null;
-                checkInProgress = false;
-                resetCheckButton();
-                displayResults(data.results);
-                showMessage('success', 'Update check completed');
-            } else if (data.status === 'error') {
-                clearInterval(statusCheckInterval);
-                statusCheckInterval = null;
-                checkInProgress = false;
-                resetCheckButton();
-                showMessage('error', data.error || 'Update check failed');
-            }
-        } catch (error) {
-            console.error('Error checking status:', error);
-        }
-    }, 2000); // Poll every 2 seconds
-}
-
-// Display check results
-function displayResults(results) {
-    if (!results || results.length === 0) {
-        return;
-    }
-    
-    // Add each result to event history
-    results.forEach(result => {
-        const hasUpdate = result.message.toLowerCase().includes('added') || 
-                         result.message.toLowerCase().includes('found');
-        const isError = result.message.toLowerCase().includes('error') || 
-                       result.message.toLowerCase().includes('failed');
-        
-        let type = 'info';
-        if (isError) {
-            type = 'error';
-        } else if (hasUpdate) {
-            type = 'success';
-        }
-        
-        addEvent(`${formatDistroName(result.distro)}: ${result.message}`, type);
-    });
-    
-    renderEvents();
-}
-
-// Add event to history
-function addEvent(message, type = 'info') {
-    const timestamp = new Date();
-    eventHistory.unshift({
-        message,
-        type,
-        timestamp
-    });
-    
-    // Keep only last 200 events
-    if (eventHistory.length > MAX_EVENTS) {
-        eventHistory = eventHistory.slice(0, MAX_EVENTS);
-    }
-}
-
-// Render events in results container
-function renderEvents() {
-    const container = document.getElementById('results-container');
-    
-    if (eventHistory.length === 0) {
-        container.innerHTML = '<p>No events yet. Select distributions and click "Check for Updates".</p>';
-        return;
-    }
-    
-    // Show header with event count
-    const eventsToShow = eventHistory.slice(0, 20);
-    container.innerHTML = `
-        <h3 style="margin-bottom: 15px;">Events (${eventHistory.length} total, showing last ${eventsToShow.length})</h3>
-        <div class="events-list"></div>
-    `;
-    
-    const eventsList = container.querySelector('.events-list');
-    
-    eventsToShow.forEach(event => {
-        const item = document.createElement('div');
-        item.className = 'result-item';
-        
-        if (event.type === 'error') {
-            item.classList.add('error');
-        } else if (event.type === 'info') {
-            item.classList.add('no-update');
-        }
-        
-        const timeStr = formatTimestamp(event.timestamp);
-        
-        item.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <div style="flex: 1;">${event.message}</div>
-                <div style="color: #999; font-size: 0.85em; white-space: nowrap; margin-left: 15px;">${timeStr}</div>
-            </div>
-        `;
-        
-        eventsList.appendChild(item);
-    });
 }
 
 // Reset check button
@@ -571,7 +524,7 @@ window.addEventListener('beforeunload', function() {
     if (autoRefreshInterval) {
         clearInterval(autoRefreshInterval);
     }
-    if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
+    if (eventSource) {
+        eventSource.close();
     }
 });

@@ -10,11 +10,12 @@ import os
 import sys
 import threading
 import time
+from collections import deque
 from datetime import datetime, time as datetime_time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response, stream_with_context
 import transmission_rpc
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -43,11 +44,28 @@ check_in_progress = False
 check_lock = threading.Lock()
 scheduler: Optional[BackgroundScheduler] = None
 scheduled_distros: List[str] = []
+event_queues: List[deque] = []  # List of event queues for SSE clients
 
 # Setup logging
 logger = setup_logging()
 # Set logger in imported module so it can be used there
 linux_iso_torrent_updater.logger = logger
+
+
+def broadcast_event(event_type: str, message: str, data: Optional[Dict] = None):
+    """Broadcast an event to all connected SSE clients."""
+    global event_queues
+    
+    event = {
+        'type': event_type,
+        'message': message,
+        'data': data or {},
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Add event to all client queues
+    for queue in event_queues:
+        queue.append(event)
 
 
 def initialize_manager():
@@ -142,26 +160,31 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
         for distro in distros:
             try:
                 logger.info(f"Checking {distro}...")
+                broadcast_event('check_start', f'Checking {distro}...', {'distro': distro})
                 
                 # Get the finder for this distro
                 finder = manager.distro_finders.get(distro)
                 if not finder:
-                    results[distro] = {
+                    result = {
                         'success': False,
                         'error': f'Unknown distribution: {distro}',
                         'status': 'error'
                     }
+                    results[distro] = result
+                    broadcast_event('check_result', f'Error: Unknown distribution {distro}', {'distro': distro, 'result': result})
                     continue
                 
                 # Find the latest torrent
                 torrent_url = finder.get_latest_torrent_url()
                 
                 if not torrent_url:
-                    results[distro] = {
+                    result = {
                         'success': False,
                         'error': 'No torrent found',
                         'status': 'error'
                     }
+                    results[distro] = result
+                    broadcast_event('check_result', f'Error: No torrent found for {distro}', {'distro': distro, 'result': result})
                     continue
                 
                 # Check if we already have this torrent in Transmission
@@ -174,11 +197,13 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                         import transmission_rpc
                         response = requests.get(torrent_url, timeout=30)
                         if response.status_code != 200:
-                            results[distro] = {
+                            result = {
                                 'success': False,
                                 'error': f'Failed to download torrent from {torrent_url}',
                                 'status': 'error'
                             }
+                            results[distro] = result
+                            broadcast_event('check_result', f'Error downloading torrent for {distro}', {'distro': distro, 'result': result})
                             continue
                         
                         new_torrent_data = response.content
@@ -193,7 +218,7 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                                 # Remove the newly added one (we only wanted to check)
                                 manager.client.remove_torrent(new_torrent.id, delete_data=True)
                                 
-                                results[distro] = {
+                                result = {
                                     'success': True,
                                     'url': torrent_url,
                                     'existing_torrent': existing_torrent.name,
@@ -202,9 +227,11 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                                     'message': f'Update available! Current: {existing_torrent.name}',
                                     'checked_at': datetime.now().isoformat()
                                 }
+                                results[distro] = result
+                                broadcast_event('check_result', f'Update available for {distro}', {'distro': distro, 'result': result})
                             else:
                                 # Same torrent ID - already up to date
-                                results[distro] = {
+                                result = {
                                     'success': True,
                                     'url': torrent_url,
                                     'existing_torrent': existing_torrent.name,
@@ -212,11 +239,13 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                                     'message': f'Already up to date: {existing_torrent.name}',
                                     'checked_at': datetime.now().isoformat()
                                 }
+                                results[distro] = result
+                                broadcast_event('check_result', f'{distro} is up to date', {'distro': distro, 'result': result})
                         
                         except transmission_rpc.error.TransmissionError as e:
                             if "duplicate" in str(e).lower():
                                 # Duplicate error means same torrent - already up to date
-                                results[distro] = {
+                                result = {
                                     'success': True,
                                     'url': torrent_url,
                                     'existing_torrent': existing_torrent.name,
@@ -224,37 +253,48 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                                     'message': f'Already up to date: {existing_torrent.name}',
                                     'checked_at': datetime.now().isoformat()
                                 }
+                                results[distro] = result
+                                broadcast_event('check_result', f'{distro} is up to date', {'distro': distro, 'result': result})
                             else:
                                 raise
                     
                     except Exception as e:
                         logger.error(f"Error comparing torrents for {distro}: {e}")
-                        results[distro] = {
+                        result = {
                             'success': False,
                             'error': str(e),
                             'existing_torrent': existing_torrent.name,
                             'status': 'error'
                         }
+                        results[distro] = result
+                        broadcast_event('check_result', f'Error checking {distro}: {str(e)}', {'distro': distro, 'result': result})
                 else:
                     # No existing torrent - this is a new one
-                    results[distro] = {
+                    result = {
                         'success': True,
                         'url': torrent_url,
                         'status': 'new',
                         'message': 'New torrent available (not currently in Transmission)',
                         'checked_at': datetime.now().isoformat()
                     }
+                    results[distro] = result
+                    broadcast_event('check_result', f'New torrent available for {distro}', {'distro': distro, 'result': result})
                     
             except Exception as e:
                 logger.error(f"Error checking {distro}: {e}")
-                results[distro] = {
+                result = {
                     'success': False,
                     'error': str(e),
                     'status': 'error'
                 }
+                results[distro] = result
+                broadcast_event('check_result', f'Error: {str(e)}', {'distro': distro, 'result': result})
         
         last_check_time = datetime.now()
         last_check_results = results
+        
+        # Broadcast check complete
+        broadcast_event('check_complete', 'Check completed', {'results': results})
         
         return results
         
@@ -501,6 +541,46 @@ def api_check_status():
         'last_check': last_check_time.isoformat() if last_check_time else None,
         'results': results_array
     })
+
+
+@app.route('/api/events')
+def api_events():
+    """Server-Sent Events endpoint for real-time updates."""
+    global event_queues
+    
+    def event_stream():
+        # Create a queue for this client
+        queue = deque(maxlen=100)
+        event_queues.append(queue)
+        
+        try:
+            # Send initial connection message
+            yield f"data: {json.dumps({'type': 'connected', 'message': 'Connected to event stream'})}\n\n"
+            
+            while True:
+                if queue:
+                    # Send all queued events
+                    while queue:
+                        event = queue.popleft()
+                        yield f"data: {json.dumps(event)}\n\n"
+                else:
+                    # Send keepalive comment every 30 seconds
+                    yield ": keepalive\n\n"
+                
+                time.sleep(0.5)  # Check every 500ms
+        except GeneratorExit:
+            # Client disconnected
+            if queue in event_queues:
+                event_queues.remove(queue)
+    
+    return Response(
+        stream_with_context(event_stream()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+    )
 
 
 @app.route('/api/update', methods=['POST'])

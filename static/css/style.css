@@ -431,6 +431,9 @@ button:disabled {
     max-height: 600px;
     overflow-y: auto;
     padding-right: 5px;
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
 }
 
 /* Custom scrollbar for events list */
@@ -452,6 +455,46 @@ button:disabled {
     background: #555;
 }
 
+/* Event items */
+.event-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    padding: 10px 0;
+    border-bottom: 1px solid #e9ecef;
+    gap: 15px;
+}
+
+.event-item:last-child {
+    border-bottom: none;
+}
+
+.event-message {
+    flex: 1;
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+
+.event-time {
+    color: #999;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+/* Event type colors */
+.event-success .event-message {
+    color: #28a745;
+}
+
+.event-error .event-message {
+    color: #dc3545;
+}
+
+.event-info .event-message {
+    color: #6c757d;
+}
+
+/* Legacy result-item for backwards compatibility */
 .result-item {
     background: #f8f9fa;
     padding: 15px;
