@@ -17,14 +17,15 @@ services:
     # Comment out ports above if using host network
     # network_mode: host
     
-    # Environment variables
-    environment:
-      - TRANSMISSION_HOST=${TRANSMISSION_HOST:-localhost}
-      - TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091}
-      - TRANSMISSION_USER=${TRANSMISSION_USER}
-      - TRANSMISSION_PASS=${TRANSMISSION_PASS}
-      - SCHEDULE_TIME=${SCHEDULE_TIME:-02:00}
-      - SCHEDULE_DISTROS=${SCHEDULE_DISTROS:-debian,ubuntu,arch,raspberrypi}
+    # Load environment from .env.local file (RECOMMENDED)
+    env_file:
+      - .env.local
+    
+    # Environment variables can be overridden here if needed
+    # Uncomment and modify as needed:
+    # environment:
+    #   - SCHEDULE_TIME=03:00
+    #   - SCHEDULE_DISTROS=debian,ubuntu
     
     # Start in web mode
     command: ["--web"]

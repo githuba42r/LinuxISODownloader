@@ -1183,6 +1183,85 @@ sudo rm /var/log/linux-iso-updater.log
 sudo systemctl daemon-reload
 ```
 
+## Development
+
+This project includes tools for easy development with hot-reload support.
+
+### Quick Start for Developers
+
+The easiest way to develop the web interface is using the provided development scripts:
+
+```bash
+# Make the script executable
+chmod +x dev-web.sh
+
+# Start development server with hot-reload on port 8099
+./dev-web.sh
+
+# With custom options
+./dev-web.sh --port 8085 --host 0.0.0.0 --schedule-time 14:30
+```
+
+**Features:**
+- Automatic reload when Python files change
+- Flask debug mode with detailed error pages
+- Runs on port 8099 by default (avoids conflict with Docker on 8084)
+- Automatic virtual environment setup
+- Dependency checking and installation
+- Colored output for better visibility
+
+### Development vs Production
+
+| Aspect | Development (`./dev-web.sh`) | Production (Docker) |
+|--------|------------------------------|---------------------|
+| Port | 8099 | 8084 |
+| Auto-reload | Yes | No |
+| Debug mode | Enabled | Disabled |
+| Performance | Slower (file monitoring) | Optimized |
+| Error pages | Detailed with traceback | Simple messages |
+
+### Making Changes
+
+1. **Python code** (`web_interface.py`, `linux_iso_torrent_updater.py`):
+   - Edit file → Server auto-restarts → Test in browser
+
+2. **HTML templates** (`templates/index.html`):
+   - Edit file → Refresh browser
+
+3. **CSS/JavaScript** (`static/css/style.css`, `static/js/app.js`):
+   - Edit file → Hard refresh browser (Ctrl+F5 or Cmd+Shift+R)
+
+### Development Scripts
+
+Two equivalent scripts are provided:
+
+- **`dev-web.sh`** - Bash script (recommended for Linux/Mac)
+- **`dev-web.py`** - Python script (cross-platform alternative)
+
+Both provide the same functionality. The Bash script has slightly better terminal output formatting.
+
+### Running Development and Production Simultaneously
+
+You can run both at the same time on different ports:
+
+```bash
+# Terminal 1: Production via Docker on port 8084
+docker-compose up web-interface
+
+# Terminal 2: Development with hot-reload on port 8099
+./dev-web.sh
+```
+
+### For More Details
+
+See **[DEVELOPMENT.md](DEVELOPMENT.md)** for comprehensive development documentation including:
+- Environment file configuration (`.env.local`, `.env.development`)
+- IDE setup (VS Code, PyCharm)
+- Troubleshooting development issues
+- Adding new distributions
+- Testing strategies
+- Contributing guidelines
+
 ## Security Considerations
 
 - Store credentials securely with restricted permissions (600)

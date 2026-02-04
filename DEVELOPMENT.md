@@ -2,6 +2,248 @@
 
 This guide explains how to set up and work with the Linux ISO Torrent Updater in a development environment.
 
+## Quick Start for Web Interface Development
+
+The easiest way to develop the web interface is using the provided development scripts with hot-reload:
+
+### Method 1: Bash Script (Recommended)
+```bash
+# Make executable (first time only)
+chmod +x dev-web.sh
+
+# Start dev server with hot-reload
+./dev-web.sh
+
+# With custom port
+./dev-web.sh --port 8085
+
+# Network accessible
+./dev-web.sh --host 0.0.0.0
+
+# Custom schedule time
+./dev-web.sh --schedule-time 14:30
+```
+
+### Method 2: Python Script
+```bash
+# Make executable (first time only)
+chmod +x dev-web.py
+
+# Start dev server with hot-reload
+./dev-web.py
+
+# With options
+./dev-web.py --port 8085 --host 0.0.0.0
+```
+
+### Method 3: Direct Flask Development
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Set Flask to development mode
+export FLASK_ENV=development
+export FLASK_DEBUG=1
+
+# Run web interface
+python web_interface.py --port 8099
+```
+
+**Features:**
+- Auto-reload on Python file changes
+- Debug mode with detailed error pages
+- Runs on port 8099 by default (avoid conflict with Docker on 8084)
+- Automatic venv setup and dependency checking
+- Colored terminal output for better visibility
+
+## Web Development Workflow
+
+### Understanding Hot-Reload
+
+The development scripts enable Flask's debug mode, which provides:
+
+1. **Python File Changes**: Automatic reload when `.py` files change
+   - Modify `web_interface.py` → Server restarts automatically
+   - Modify `linux_iso_torrent_updater.py` → Server restarts automatically
+
+2. **Template Changes**: Automatic reload
+   - Modify `templates/index.html` → Refresh browser to see changes
+   - No server restart needed
+
+3. **Static File Changes**: Manual browser refresh needed
+   - Modify `static/css/style.css` → Hard refresh browser (Ctrl+F5 or Cmd+Shift+R)
+   - Modify `static/js/app.js` → Hard refresh browser
+   - Browser cache may need clearing for CSS/JS changes
+
+### Development vs Production
+
+| Feature | Development (dev-web scripts) | Production (Docker) |
+|---------|-------------------------------|---------------------|
+| Port | 8099 (default) | 8084 |
+| Auto-reload | Yes (Flask debug mode) | No |
+| Error pages | Detailed with traceback | Simple error messages |
+| Performance | Slower (checking files) | Faster (optimized) |
+| Logging | Verbose DEBUG output | INFO level |
+| Scheduler warnings | Shows "double start" (normal) | Clean single start |
+
+### Common Development Tasks
+
+#### Adding a New API Endpoint
+
+1. Add route to `web_interface.py`:
+```python
+@app.route('/api/mynew-endpoint')
+def my_new_endpoint():
+    return jsonify({'status': 'success', 'data': 'example'})
+```
+
+2. Save file → Server auto-restarts
+3. Test: `curl http://localhost:8099/api/mynew-endpoint`
+
+#### Modifying the UI
+
+1. **HTML Changes**: Edit `templates/index.html`
+   - Save file
+   - Refresh browser
+
+2. **CSS Changes**: Edit `static/css/style.css`
+   - Save file
+   - Hard refresh browser (Ctrl+F5)
+
+3. **JavaScript Changes**: Edit `static/js/app.js`
+   - Save file
+   - Hard refresh browser (Ctrl+F5)
+
+#### Testing Different Configurations
+
+Use environment variables or command-line arguments:
+
+```bash
+# Different Transmission server
+TRANSMISSION_HOST=192.168.1.50 ./dev-web.sh
+
+# Different schedule time
+./dev-web.sh --schedule-time 10:00
+
+# Disable scheduler during development
+SCHEDULE_TIME=disabled ./dev-web.sh
+
+# Custom port to run multiple instances
+./dev-web.sh --port 8095
+```
+
+### Troubleshooting Development Mode
+
+#### Issue: "Address already in use"
+```bash
+# Kill process on port 8099
+lsof -ti:8099 | xargs kill -9
+
+# Or use a different port
+./dev-web.sh --port 8100
+```
+
+#### Issue: Changes not reflecting
+```bash
+# For Python changes: Check console for errors
+# The dev server should say "Restarting with stat"
+
+# For CSS/JS changes: Hard refresh browser
+# Chrome/Edge: Ctrl+Shift+R or Ctrl+F5
+# Firefox: Ctrl+Shift+R or Cmd+Shift+R (Mac)
+# Safari: Cmd+Option+R
+
+# Clear browser cache if still not working
+```
+
+#### Issue: Scheduler runs twice
+```
+[INFO] Scheduled daily check for 02:00
+[INFO] Scheduled daily check for 02:00
+```
+This is **normal** in development mode. Flask debug runs two processes:
+- Main process
+- Reloader process (monitors file changes)
+
+Both processes start the scheduler. In production (Docker), only one runs.
+
+#### Issue: Module not found
+```bash
+# Ensure venv is activated
+source venv/bin/activate
+
+# Reinstall dependencies
+pip install -r requirements.txt
+
+# Or let dev script handle it
+./dev-web.sh  # Automatically checks dependencies
+```
+
+#### Issue: Can't connect to Transmission
+```bash
+# Check your .env.local configuration
+cat .env.local | grep TRANSMISSION
+
+# Test connection manually
+curl -u username:password http://localhost:9091/transmission/rpc
+
+# Verify environment variables are loaded
+./dev-web.sh 2>&1 | grep "Connecting to Transmission"
+```
+
+### Using with Docker Compose
+
+You can run Docker production mode alongside development:
+
+```bash
+# Terminal 1: Run production on port 8084
+docker-compose up web-interface
+
+# Terminal 2: Run development on port 8099
+./dev-web.sh
+```
+
+Access both simultaneously:
+- Production: http://localhost:8084
+- Development: http://localhost:8099
+
+### IDE Integration
+
+#### VS Code
+Add to `.vscode/launch.json`:
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Flask Web Interface",
+            "type": "python",
+            "request": "launch",
+            "module": "flask",
+            "env": {
+                "FLASK_APP": "web_interface.py",
+                "FLASK_ENV": "development",
+                "FLASK_DEBUG": "1"
+            },
+            "args": [
+                "run",
+                "--port=8099",
+                "--host=127.0.0.1"
+            ],
+            "envFile": "${workspaceFolder}/.env.local"
+        }
+    ]
+}
+```
+
+#### PyCharm
+1. Right-click `web_interface.py` → Run
+2. Edit configuration → Add environment variables:
+   - `FLASK_ENV=development`
+   - `FLASK_DEBUG=1`
+3. Set script parameters: `--port 8099`
+4. Load environment from: `.env.local`
+
 ## Environment Files
 
 The project supports multiple environment files for different scenarios:
