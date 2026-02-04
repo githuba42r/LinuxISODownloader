@@ -86,10 +86,24 @@ async function updateStatus() {
         const response = await fetch('/api/status');
         const data = await response.json();
         
-        // Update manager status
+        // Update manager status with enhanced information
         const statusElement = document.getElementById('manager-status');
+        const statusText = data.status_text || capitalizeFirst(data.status);
+        const scheduleInfo = data.schedule_info || '';
+        
         statusElement.innerHTML = `
-            <span class="status status-${data.status}">${capitalizeFirst(data.status)}</span>
+            <div class="status-line">
+                <span class="status status-${data.status}">${statusText}</span>
+            </div>
+            ${scheduleInfo !== 'Disabled' ? `
+                <div class="status-schedule">
+                    ${scheduleInfo}
+                </div>
+            ` : `
+                <div class="status-schedule status-disabled">
+                    Automatic checks: Disabled
+                </div>
+            `}
         `;
         
         // Update torrents list

@@ -60,6 +60,21 @@ h1 {
     margin-right: 10px;
 }
 
+.status-line {
+    margin-bottom: 8px;
+}
+
+.status-schedule {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 5px;
+}
+
+.status-schedule.status-disabled {
+    color: #999;
+    font-style: italic;
+}
+
 .status-idle {
     background-color: #e3f2fd;
     color: #1976d2;
@@ -68,6 +83,12 @@ h1 {
 .status-checking {
     background-color: #fff3e0;
     color: #f57c00;
+    animation: pulse 2s infinite;
+}
+
+.status-downloading {
+    background-color: #e8f5e9;
+    color: #2e7d32;
     animation: pulse 2s infinite;
 }
 

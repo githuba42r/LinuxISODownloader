@@ -360,21 +360,73 @@ def index():
 
 @app.route('/api/status')
 def api_status():
-    """Get current status of all torrents."""
+    """Get current status of all torrents and manager state."""
     torrents = get_torrent_status()
     
-    # Determine status
+    # Determine manager status based on current state
     if check_in_progress:
         status = 'checking'
+        status_text = 'Checking for updates...'
     elif not manager:
         status = 'error'
+        status_text = 'Manager not initialized'
     else:
-        status = 'idle'
+        # Check if any torrents are actively downloading
+        downloading = any(t.get('percentDone', 1) < 1.0 for t in torrents)
+        
+        if downloading:
+            status = 'downloading'
+            status_text = 'Downloading torrents'
+        else:
+            # All torrents complete or seeding
+            status = 'idle'
+            status_text = 'All torrents up to date'
+    
+    # Get next scheduled check time
+    next_check = None
+    schedule_info = 'Disabled'
+    
+    if scheduler and scheduler.running:
+        jobs = scheduler.get_jobs()
+        if jobs:
+            job = jobs[0]  # Get the torrent_check job
+            next_run = job.next_run_time
+            if next_run:
+                next_check = next_run.isoformat()
+                # Calculate time until next run
+                from datetime import datetime
+                now = datetime.now(next_run.tzinfo) if next_run.tzinfo else datetime.now()
+                
+                time_until = next_run - now
+                total_seconds = time_until.total_seconds()
+                
+                if total_seconds < 0:
+                    schedule_info = 'Running now...'
+                elif total_seconds < 60:
+                    schedule_info = 'Next check in <1m'
+                else:
+                    hours = int(total_seconds // 3600)
+                    minutes = int((total_seconds % 3600) // 60)
+                    
+                    if hours >= 24:
+                        days = hours // 24
+                        remaining_hours = hours % 24
+                        if remaining_hours > 0:
+                            schedule_info = f'Next check in {days}d {remaining_hours}h'
+                        else:
+                            schedule_info = f'Next check in {days}d'
+                    elif hours > 0:
+                        schedule_info = f'Next check in {hours}h {minutes}m'
+                    else:
+                        schedule_info = f'Next check in {minutes}m'
     
     return jsonify({
         'status': status,
+        'status_text': status_text,
+        'schedule_info': schedule_info,
         'torrents': torrents,
         'last_check': last_check_time.isoformat() if last_check_time else None,
+        'next_check': next_check,
         'check_in_progress': check_in_progress,
         'available_distros': list(manager.distro_finders.keys()) if manager else []
     })
