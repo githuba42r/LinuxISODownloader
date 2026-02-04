@@ -8,65 +8,46 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>🐧 Linux ISO Torrent Updater</h1>
-            <p class="subtitle">Manage your Linux distribution torrents</p>
-        </header>
-
-        <main>
-            <!-- Status Section -->
-            <section class="card">
-                <h2>📊 System Status</h2>
-                <div id="system-status">
-                    <div class="status-item">
-                        <span class="label">Transmission:</span>
-                        <span id="transmission-status" class="status-badge">Checking...</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="label">Last Check:</span>
-                        <span id="last-check">Never</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="label">Check Status:</span>
-                        <span id="check-status" class="status-badge">Idle</span>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Distribution Selection -->
-            <section class="card">
-                <h2>🔍 Check for Updates</h2>
-                <div class="distro-selection">
-                    <div class="distro-checkboxes" id="distro-checkboxes">
-                        <!-- Dynamically populated -->
-                    </div>
-                    <div class="button-group">
-                        <button id="select-all-btn" class="btn btn-secondary">Select All</button>
-                        <button id="check-btn" class="btn btn-primary">Check for Updates</button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Check Results -->
-            <section class="card" id="check-results-section" style="display: none;">
-                <h2>🔎 Check Results</h2>
-                <div id="check-results">
-                    <!-- Dynamically populated -->
-                </div>
-            </section>
-
-            <!-- Active Torrents -->
-            <section class="card">
-                <h2>📥 Active Torrents</h2>
-                <div id="torrents-list">
-                    <p class="loading">Loading torrents...</p>
-                </div>
-            </section>
-        </main>
-
-        <footer>
-            <p>Linux ISO Torrent Updater &copy; 2026 | Auto-refresh every 5 seconds</p>
-        </footer>
+        <h1>Linux ISO Torrent Updater</h1>
+        
+        <!-- Messages container -->
+        <div id="message-container"></div>
+        
+        <!-- Manager Status -->
+        <div class="card">
+            <h2>Manager Status</h2>
+            <div id="manager-status">
+                <span class="status status-idle">Loading...</span>
+            </div>
+        </div>
+        
+        <!-- Distribution Selection -->
+        <div class="card">
+            <h2>Select Distributions</h2>
+            <div class="distro-grid" id="distros-container">
+                <!-- Dynamically populated -->
+            </div>
+            <div class="button-group">
+                <button id="select-all-btn" class="btn-secondary">Select All</button>
+                <button id="check-updates-btn" class="btn-primary">Check for Updates</button>
+            </div>
+        </div>
+        
+        <!-- Check Results -->
+        <div class="card">
+            <h2>Results</h2>
+            <div id="results-container">
+                <p>No results yet. Select distributions and click "Check for Updates".</p>
+            </div>
+        </div>
+        
+        <!-- Active Torrents -->
+        <div class="card">
+            <h2>Active Torrents</h2>
+            <div id="torrents-list">
+                <p>Loading torrents...</p>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>

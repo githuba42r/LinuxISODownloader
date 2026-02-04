@@ -105,10 +105,12 @@ def get_torrent_status() -> List[Dict]:
                     'name': torrent.name,
                     'distro': distro,
                     'status': torrent.status,
-                    'progress': torrent.progress,
-                    'download_rate': torrent.rate_download,
-                    'upload_rate': torrent.rate_upload,
-                    'size': torrent.total_size,
+                    'percentDone': torrent.progress,
+                    'rateDownload': torrent.rate_download,
+                    'rateUpload': torrent.rate_upload,
+                    'totalSize': torrent.total_size,
+                    'downloadedEver': torrent.downloaded_ever,
+                    'uploadRatio': torrent.upload_ratio,
                     'eta': torrent.eta.seconds if torrent.eta else None,
                     'peers_connected': torrent.peers_connected,
                     'seeders': getattr(torrent, 'peers_sending_to_us', 0),
@@ -282,7 +284,16 @@ def api_status():
     """Get current status of all torrents."""
     torrents = get_torrent_status()
     
+    # Determine status
+    if check_in_progress:
+        status = 'checking'
+    elif not manager:
+        status = 'error'
+    else:
+        status = 'idle'
+    
     return jsonify({
+        'status': status,
         'torrents': torrents,
         'last_check': last_check_time.isoformat() if last_check_time else None,
         'check_in_progress': check_in_progress,
@@ -353,6 +364,15 @@ def api_config():
     return jsonify({
         'available_distros': list(manager.distro_finders.keys()) if manager else [],
         'transmission_connected': manager is not None and manager.client is not None
+    })
+
+
+@app.route('/api/distros')
+def api_distros():
+    """Get list of available distributions."""
+    distros = ['centos', 'debian', 'ubuntu', 'arch', 'raspberrypi']
+    return jsonify({
+        'distros': distros
     })
 
 
