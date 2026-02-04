@@ -35,6 +35,11 @@ h1 {
     margin: 0;
 }
 
+.header-buttons {
+    display: flex;
+    gap: 15px;
+}
+
 .btn-icon {
     background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
@@ -49,11 +54,20 @@ h1 {
     cursor: pointer;
     transition: all 0.3s;
     padding: 0;
+    text-decoration: none;
 }
 
 .btn-icon:hover {
     background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+#settings-btn:hover {
     transform: rotate(90deg) scale(1.1);
+}
+
+#transmission-btn:hover {
+    transform: translateY(-3px) scale(1.1);
 }
 
 .btn-icon svg {
@@ -411,6 +425,31 @@ button:disabled {
 /* Results display */
 .results {
     margin-top: 20px;
+}
+
+.events-list {
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+/* Custom scrollbar for events list */
+.events-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.events-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.events-list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.events-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .result-item {

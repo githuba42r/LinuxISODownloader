@@ -2,9 +2,12 @@
 let checkInProgress = false;
 let autoRefreshInterval = null;
 let statusCheckInterval = null;
+let eventHistory = []; // Store last 200 events
+const MAX_EVENTS = 200;
 
 // Initialize the app when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    loadConfig();
     loadDistros();
     updateStatus();
     startAutoRefresh();
@@ -27,6 +30,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Load configuration and set up Transmission button
+async function loadConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const config = await response.json();
+        
+        // Set Transmission button URL
+        const transmissionBtn = document.getElementById('transmission-btn');
+        if (transmissionBtn && config.transmission_url) {
+            transmissionBtn.href = config.transmission_url;
+        }
+    } catch (error) {
+        console.error('Error loading config:', error);
+    }
+}
 
 // Load available distributions
 async function loadDistros() {
@@ -285,33 +304,83 @@ function startStatusCheck() {
 
 // Display check results
 function displayResults(results) {
-    const container = document.getElementById('results-container');
-    container.innerHTML = '<h3 style="margin-bottom: 15px;">Results:</h3>';
-    
     if (!results || results.length === 0) {
-        container.innerHTML += '<div class="empty-state"><p>No results</p></div>';
         return;
     }
     
+    // Add each result to event history
     results.forEach(result => {
-        const item = document.createElement('div');
         const hasUpdate = result.message.toLowerCase().includes('added') || 
                          result.message.toLowerCase().includes('found');
         const isError = result.message.toLowerCase().includes('error') || 
                        result.message.toLowerCase().includes('failed');
         
-        item.className = 'result-item';
+        let type = 'info';
         if (isError) {
+            type = 'error';
+        } else if (hasUpdate) {
+            type = 'success';
+        }
+        
+        addEvent(`${formatDistroName(result.distro)}: ${result.message}`, type);
+    });
+    
+    renderEvents();
+}
+
+// Add event to history
+function addEvent(message, type = 'info') {
+    const timestamp = new Date();
+    eventHistory.unshift({
+        message,
+        type,
+        timestamp
+    });
+    
+    // Keep only last 200 events
+    if (eventHistory.length > MAX_EVENTS) {
+        eventHistory = eventHistory.slice(0, MAX_EVENTS);
+    }
+}
+
+// Render events in results container
+function renderEvents() {
+    const container = document.getElementById('results-container');
+    
+    if (eventHistory.length === 0) {
+        container.innerHTML = '<p>No events yet. Select distributions and click "Check for Updates".</p>';
+        return;
+    }
+    
+    // Show header with event count
+    const eventsToShow = eventHistory.slice(0, 20);
+    container.innerHTML = `
+        <h3 style="margin-bottom: 15px;">Events (${eventHistory.length} total, showing last ${eventsToShow.length})</h3>
+        <div class="events-list"></div>
+    `;
+    
+    const eventsList = container.querySelector('.events-list');
+    
+    eventsToShow.forEach(event => {
+        const item = document.createElement('div');
+        item.className = 'result-item';
+        
+        if (event.type === 'error') {
             item.classList.add('error');
-        } else if (!hasUpdate) {
+        } else if (event.type === 'info') {
             item.classList.add('no-update');
         }
         
+        const timeStr = formatTimestamp(event.timestamp);
+        
         item.innerHTML = `
-            <strong>${formatDistroName(result.distro)}:</strong> ${result.message}
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">${event.message}</div>
+                <div style="color: #999; font-size: 0.85em; white-space: nowrap; margin-left: 15px;">${timeStr}</div>
+            </div>
         `;
         
-        container.appendChild(item);
+        eventsList.appendChild(item);
     });
 }
 
@@ -434,8 +503,9 @@ async function saveSettings() {
         const result = await response.json();
         
         if (result.success) {
-            showMessage('success', 'Settings saved successfully');
             closeSettings();
+            // Display settings change in results container
+            displaySettingsResult(settings);
             // Refresh status to show updated schedule info
             updateStatus();
         } else {
@@ -445,6 +515,55 @@ async function saveSettings() {
         console.error('Error saving settings:', error);
         showMessage('error', 'Failed to save settings');
     }
+}
+
+// Display settings changes in results container
+function displaySettingsResult(settings) {
+    // Get friendly frequency name
+    const frequencyNames = {
+        '1h': 'Every 1 hour',
+        '8h': 'Every 8 hours',
+        '1d': 'Every 1 day',
+        '7d': 'Every 7 days',
+        '14d': 'Every 14 days',
+        '30d': 'Every 30 days'
+    };
+    
+    const frequencyText = frequencyNames[settings.frequency] || settings.frequency;
+    
+    if (settings.enabled) {
+        addEvent(`Settings: Automatic checking enabled (${frequencyText})`, 'success');
+    } else {
+        addEvent('Settings: Automatic checking disabled', 'info');
+    }
+    
+    renderEvents();
+}
+
+// Format timestamp for display
+function formatTimestamp(date) {
+    const now = new Date();
+    const diff = now - date;
+    
+    // Less than 1 minute
+    if (diff < 60000) {
+        return 'Just now';
+    }
+    
+    // Less than 1 hour
+    if (diff < 3600000) {
+        const mins = Math.floor(diff / 60000);
+        return `${mins}m ago`;
+    }
+    
+    // Less than 1 day
+    if (diff < 86400000) {
+        const hours = Math.floor(diff / 3600000);
+        return `${hours}h ago`;
+    }
+    
+    // More than 1 day - show date/time
+    return date.toLocaleString();
 }
 
 // Clean up on page unload

@@ -533,9 +533,15 @@ def api_update():
 @app.route('/api/config')
 def api_config():
     """Get current configuration."""
+    # Get Transmission URL from environment
+    transmission_host = os.environ.get('TRANSMISSION_HOST', 'localhost')
+    transmission_port = os.environ.get('TRANSMISSION_PORT', '9091')
+    transmission_url = f"http://{transmission_host}:{transmission_port}/transmission/web/"
+    
     return jsonify({
         'available_distros': list(manager.distro_finders.keys()) if manager else [],
-        'transmission_connected': manager is not None and manager.client is not None
+        'transmission_connected': manager is not None and manager.client is not None,
+        'transmission_url': transmission_url
     })
 
 
