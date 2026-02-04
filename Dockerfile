@@ -31,11 +31,8 @@ RUN python -m venv /opt/venv && \
 # Copy application files
 COPY linux_iso_torrent_updater.py .
 
-# Copy .env files if they exist (optional for local development)
-# Note: .env.local should never be in the image - use --env-file at runtime
-COPY .env* ./
-# Remove .env.local if accidentally copied
-RUN rm -f .env.local .env.*.local
+# Note: Environment variables should be provided via docker run -e or --env-file
+# The .env files are not copied into the image for security reasons
 
 # Ensure script is executable
 RUN chmod +x linux_iso_torrent_updater.py
