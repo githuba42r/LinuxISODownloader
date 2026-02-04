@@ -19,6 +19,7 @@ import transmission_rpc
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 # Import the torrent manager from the main script
 sys.path.insert(0, str(Path(__file__).parent))
@@ -590,6 +591,114 @@ def api_distros():
         'distros': distros,
         'default_selected': default_selected
     })
+
+
+@app.route('/api/settings', methods=['GET'])
+def api_get_settings():
+    """Get current scheduler settings."""
+    global scheduler, scheduled_distros
+    
+    # Check if scheduler is enabled
+    enabled = scheduler is not None and scheduler.running
+    
+    # Get frequency from scheduler job if exists
+    frequency = '1d'  # default
+    if enabled and scheduler:
+        jobs = scheduler.get_jobs()
+        if jobs:
+            job = jobs[0]
+            trigger = job.trigger
+            if hasattr(trigger, 'fields'):
+                # Extract frequency from cron trigger
+                # For now, we'll store the current schedule type
+                # This is a simple implementation - can be enhanced
+                frequency = '1d'  # Default to daily
+    
+    return jsonify({
+        'enabled': enabled,
+        'frequency': frequency,
+        'distros': scheduled_distros
+    })
+
+
+@app.route('/api/settings', methods=['POST'])
+def api_update_settings():
+    """Update scheduler settings."""
+    global scheduler, scheduled_distros
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+    
+    enabled = data.get('enabled', False)
+    frequency = data.get('frequency', '1d')
+    
+    # Stop existing scheduler if any
+    if scheduler and scheduler.running:
+        logger.info("Stopping existing scheduler...")
+        scheduler.shutdown(wait=False)
+        scheduler = None
+    
+    # If enabled, create new scheduler with the specified frequency
+    if enabled:
+        try:
+            # Parse frequency to cron trigger
+            trigger = parse_frequency_to_trigger(frequency)
+            
+            # Create new scheduler
+            scheduler = BackgroundScheduler()
+            scheduler.add_job(
+                scheduled_check,
+                trigger=trigger,
+                id='torrent_check',
+                name=f'Automatic torrent check ({frequency})',
+                replace_existing=True
+            )
+            scheduler.start()
+            
+            logger.info(f"Scheduler enabled with frequency: {frequency}")
+            
+            return jsonify({
+                'success': True,
+                'message': f'Automatic checking enabled ({frequency})',
+                'enabled': True,
+                'frequency': frequency
+            })
+        except Exception as e:
+            logger.error(f"Failed to setup scheduler: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    else:
+        logger.info("Scheduler disabled")
+        return jsonify({
+            'success': True,
+            'message': 'Automatic checking disabled',
+            'enabled': False
+        })
+
+
+def parse_frequency_to_trigger(frequency: str):
+    """
+    Parse frequency string to APScheduler trigger.
+    
+    Args:
+        frequency: One of '1h', '8h', '1d', '7d', '14d', '30d'
+    
+    Returns:
+        APScheduler trigger object
+    """
+    frequency_map = {
+        '1h': {'hours': 1},
+        '8h': {'hours': 8},
+        '1d': {'days': 1},
+        '7d': {'days': 7},
+        '14d': {'days': 14},
+        '30d': {'days': 30}
+    }
+    
+    if frequency not in frequency_map:
+        raise ValueError(f"Invalid frequency: {frequency}")
+    
+    return IntervalTrigger(**frequency_map[frequency])
 
 
 def main():

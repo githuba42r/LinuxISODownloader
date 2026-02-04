@@ -8,7 +8,15 @@
 </head>
 <body>
     <div class="container">
-        <h1>Linux ISO Torrent Updater</h1>
+        <header class="page-header">
+            <h1>Linux ISO Torrent Updater</h1>
+            <button id="settings-btn" class="btn-icon" title="Settings">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6m5.5-14.5l-4.2 4.2m0 8.6l4.2 4.2m5.5-11h-6m-6 0H1m14.5 5.5l-4.2-4.2m0-8.6L6.5 6.5"></path>
+                </svg>
+            </button>
+        </header>
         
         <!-- Messages container -->
         <div id="message-container"></div>
@@ -46,6 +54,47 @@
             <h2>Active Torrents</h2>
             <div id="torrents-list">
                 <p>Loading torrents...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="modal-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <div class="setting-label">
+                        <strong>Automatic Checking</strong>
+                        <p class="setting-description">Enable automatic updates at scheduled intervals</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="auto-check-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <div class="setting-group" id="frequency-group">
+                    <div class="setting-label">
+                        <strong>Check Frequency</strong>
+                        <p class="setting-description">How often to check for updates</p>
+                    </div>
+                    <select id="check-frequency" class="frequency-select">
+                        <option value="1h">Every 1 hour</option>
+                        <option value="8h">Every 8 hours</option>
+                        <option value="1d">Every 1 day</option>
+                        <option value="7d">Every 7 days</option>
+                        <option value="14d">Every 14 days</option>
+                        <option value="30d">Every 30 days</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-settings" class="btn-secondary">Cancel</button>
+                <button id="save-settings" class="btn-primary">Save Changes</button>
             </div>
         </div>
     </div>

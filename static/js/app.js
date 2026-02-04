@@ -12,6 +12,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set up event listeners
     document.getElementById('select-all-btn').addEventListener('click', selectAllDistros);
     document.getElementById('check-updates-btn').addEventListener('click', checkForUpdates);
+    
+    // Settings modal listeners
+    document.getElementById('settings-btn').addEventListener('click', openSettings);
+    document.getElementById('close-modal').addEventListener('click', closeSettings);
+    document.getElementById('cancel-settings').addEventListener('click', closeSettings);
+    document.getElementById('save-settings').addEventListener('click', saveSettings);
+    document.getElementById('auto-check-toggle').addEventListener('change', toggleFrequencyGroup);
+    
+    // Close modal when clicking outside
+    document.getElementById('settings-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeSettings();
+        }
+    });
 });
 
 // Load available distributions
@@ -353,6 +367,84 @@ function formatBytes(bytes) {
 function formatSpeed(bytesPerSecond) {
     if (bytesPerSecond === 0) return '0 B/s';
     return formatBytes(bytesPerSecond) + '/s';
+}
+
+// Settings Modal Functions
+async function openSettings() {
+    const modal = document.getElementById('settings-modal');
+    modal.classList.add('active');
+    
+    // Load current settings
+    try {
+        const response = await fetch('/api/settings');
+        const settings = await response.json();
+        
+        const toggle = document.getElementById('auto-check-toggle');
+        const frequencySelect = document.getElementById('check-frequency');
+        const frequencyGroup = document.getElementById('frequency-group');
+        
+        toggle.checked = settings.enabled;
+        frequencySelect.value = settings.frequency || '1d';
+        
+        if (settings.enabled) {
+            frequencyGroup.classList.add('enabled');
+        } else {
+            frequencyGroup.classList.remove('enabled');
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        showMessage('error', 'Failed to load settings');
+    }
+}
+
+function closeSettings() {
+    const modal = document.getElementById('settings-modal');
+    modal.classList.remove('active');
+}
+
+function toggleFrequencyGroup() {
+    const toggle = document.getElementById('auto-check-toggle');
+    const frequencyGroup = document.getElementById('frequency-group');
+    
+    if (toggle.checked) {
+        frequencyGroup.classList.add('enabled');
+    } else {
+        frequencyGroup.classList.remove('enabled');
+    }
+}
+
+async function saveSettings() {
+    const toggle = document.getElementById('auto-check-toggle');
+    const frequencySelect = document.getElementById('check-frequency');
+    
+    const settings = {
+        enabled: toggle.checked,
+        frequency: frequencySelect.value
+    };
+    
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(settings)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage('success', 'Settings saved successfully');
+            closeSettings();
+            // Refresh status to show updated schedule info
+            updateStatus();
+        } else {
+            showMessage('error', result.error || 'Failed to save settings');
+        }
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        showMessage('error', 'Failed to save settings');
+    }
 }
 
 // Clean up on page unload
