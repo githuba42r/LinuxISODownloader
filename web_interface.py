@@ -147,30 +147,79 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                 if not finder:
                     results[distro] = {
                         'success': False,
-                        'error': f'Unknown distribution: {distro}'
+                        'error': f'Unknown distribution: {distro}',
+                        'status': 'error'
                     }
                     continue
                 
                 # Find the latest torrent
                 torrent_url = finder.get_latest_torrent_url()
                 
-                if torrent_url:
+                if not torrent_url:
+                    results[distro] = {
+                        'success': False,
+                        'error': 'No torrent found',
+                        'status': 'error'
+                    }
+                    continue
+                
+                # Check if we already have this torrent in Transmission
+                existing_torrent = manager.find_existing_torrent(distro)
+                
+                if existing_torrent:
+                    # We have a torrent for this distro - need to check if it's the same
+                    # Download the new torrent to compare
+                    try:
+                        import requests
+                        import hashlib
+                        response = requests.get(torrent_url, timeout=30)
+                        if response.status_code == 200:
+                            new_torrent_data = response.content
+                            new_hash = hashlib.sha256(new_torrent_data).hexdigest()
+                            
+                            # Try to determine if update is needed by checking torrent name
+                            # (We can't easily get the hash of existing torrent without downloading it again)
+                            results[distro] = {
+                                'success': True,
+                                'url': torrent_url,
+                                'existing_torrent': existing_torrent.name,
+                                'existing_id': existing_torrent.id,
+                                'status': 'needs_comparison',
+                                'message': f'Found new torrent, need to compare with existing: {existing_torrent.name}',
+                                'checked_at': datetime.now().isoformat()
+                            }
+                        else:
+                            results[distro] = {
+                                'success': False,
+                                'error': f'Failed to download torrent from {torrent_url}',
+                                'status': 'error'
+                            }
+                    except Exception as e:
+                        logger.error(f"Error downloading torrent for comparison: {e}")
+                        results[distro] = {
+                            'success': True,
+                            'url': torrent_url,
+                            'existing_torrent': existing_torrent.name,
+                            'status': 'found_with_existing',
+                            'message': f'Found torrent URL, existing: {existing_torrent.name}',
+                            'checked_at': datetime.now().isoformat()
+                        }
+                else:
+                    # No existing torrent - this is a new one
                     results[distro] = {
                         'success': True,
                         'url': torrent_url,
+                        'status': 'new',
+                        'message': 'New torrent available (not currently in Transmission)',
                         'checked_at': datetime.now().isoformat()
-                    }
-                else:
-                    results[distro] = {
-                        'success': False,
-                        'error': 'No torrent found'
                     }
                     
             except Exception as e:
                 logger.error(f"Error checking {distro}: {e}")
                 results[distro] = {
                     'success': False,
-                    'error': str(e)
+                    'error': str(e),
+                    'status': 'error'
                 }
         
         last_check_time = datetime.now()
@@ -324,10 +373,49 @@ def api_check():
 @app.route('/api/check/status')
 def api_check_status():
     """Get status of the last check."""
+    # Determine status string for frontend
+    if check_in_progress:
+        status = 'in_progress'
+    elif last_check_results:
+        status = 'completed'
+    else:
+        status = 'idle'
+    
+    # Transform results from dict to array format expected by frontend
+    results_array = []
+    if last_check_results:
+        for distro, result in last_check_results.items():
+            message = ''
+            result_status = result.get('status', 'unknown')
+            
+            if result_status == 'error':
+                message = f"Error: {result.get('error', 'Unknown error')}"
+            elif result_status == 'new':
+                message = f"New torrent available (not in Transmission yet)"
+            elif result_status == 'found_with_existing':
+                existing = result.get('existing_torrent', 'unknown')
+                message = f"Found torrent. Current in Transmission: {existing}"
+            elif result_status == 'needs_comparison':
+                existing = result.get('existing_torrent', 'unknown')
+                message = f"Found torrent. Compare with existing: {existing}"
+            elif result.get('success'):
+                message = f"Found torrent: {result.get('url', 'N/A')}"
+            else:
+                message = f"Error: {result.get('error', 'Unknown error')}"
+            
+            results_array.append({
+                'distro': distro,
+                'message': message,
+                'success': result.get('success', False),
+                'url': result.get('url'),
+                'existing_torrent': result.get('existing_torrent')
+            })
+    
     return jsonify({
+        'status': status,
         'in_progress': check_in_progress,
         'last_check': last_check_time.isoformat() if last_check_time else None,
-        'results': last_check_results
+        'results': results_array
     })
 
 
