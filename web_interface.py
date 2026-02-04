@@ -113,6 +113,15 @@ def get_torrent_status() -> List[Dict]:
                 'ubuntu': ['ubuntu'],
                 'arch': ['arch', 'archlinux'],
                 'raspberrypi': ['raspios', 'raspberry', 'raspberrypi'],
+                'linuxmint': ['linuxmint', 'mint'],
+                'fedora': ['fedora'],
+                'popos': ['pop-os', 'pop_os', 'popos'],
+                'rocky': ['rocky'],
+                'alma': ['alma', 'almalinux'],
+                'manjaro': ['manjaro'],
+                'elementary': ['elementary'],
+                'zorin': ['zorin'],
+                'endeavour': ['endeavour', 'endeavouros'],
             }.items():
                 if any(pattern.lower() in torrent.name.lower() for pattern in patterns):
                     distro = distro_name
@@ -414,7 +423,7 @@ def setup_scheduler(schedule_time: str, distros: List[str]) -> bool:
         logger.error(f"Invalid schedule time format '{schedule_time}'. Use HH:MM (24-hour) or 'disabled'. Error: {e}")
         return False
     
-    scheduled_distros = distros if distros else ['debian', 'ubuntu', 'arch', 'raspberrypi']
+    scheduled_distros = distros if distros else ['debian', 'ubuntu', 'arch', 'fedora', 'linuxmint', 'rocky']
     
     # Create scheduler
     scheduler = BackgroundScheduler()
@@ -700,6 +709,60 @@ def api_distros():
             'name': 'Raspberry Pi OS',
             'logo': 'https://www.raspberrypi.com/app/uploads/2022/02/COLOUR-Raspberry-Pi-Symbol-Registered.png',
             'color': '#C51A4A'
+        },
+        'linuxmint': {
+            'id': 'linuxmint',
+            'name': 'Linux Mint',
+            'logo': 'https://upload.wikimedia.org/wikipedia/commons/3/3f/Linux_Mint_logo_without_wordmark.svg',
+            'color': '#87CF3E'
+        },
+        'fedora': {
+            'id': 'fedora',
+            'name': 'Fedora Workstation',
+            'logo': 'https://fedoraproject.org/assets/images/fedora-workstation-logo.png',
+            'color': '#51A2DA'
+        },
+        'popos': {
+            'id': 'popos',
+            'name': 'Pop!_OS',
+            'logo': 'https://pop.system76.com/icon.svg',
+            'color': '#48B9C7'
+        },
+        'rocky': {
+            'id': 'rocky',
+            'name': 'Rocky Linux',
+            'logo': 'https://rockylinux.org/images/rocky-logo.svg',
+            'color': '#10B981'
+        },
+        'alma': {
+            'id': 'alma',
+            'name': 'AlmaLinux',
+            'logo': 'https://almalinux.org/images/logo.svg',
+            'color': '#0F4266'
+        },
+        'manjaro': {
+            'id': 'manjaro',
+            'name': 'Manjaro',
+            'logo': 'https://manjaro.org/img/logo.svg',
+            'color': '#35BF5C'
+        },
+        'elementary': {
+            'id': 'elementary',
+            'name': 'elementary OS',
+            'logo': 'https://elementary.io/images/favicon.svg',
+            'color': '#64BAFF'
+        },
+        'zorin': {
+            'id': 'zorin',
+            'name': 'Zorin OS',
+            'logo': 'https://assets.zorincdn.com/images/logo.svg',
+            'color': '#15A6F0'
+        },
+        'endeavour': {
+            'id': 'endeavour',
+            'name': 'EndeavourOS',
+            'logo': 'https://endeavouros.com/wp-content/uploads/2021/03/endeavouros-icon.png',
+            'color': '#7F7FFF'
         }
     }
     
@@ -860,7 +923,7 @@ def main():
     
     # Configure scheduler
     schedule_time = args.schedule_time or os.environ.get('SCHEDULE_TIME', '02:00')
-    schedule_distros_str = args.schedule_distros or os.environ.get('SCHEDULE_DISTROS', 'debian,ubuntu,arch,raspberrypi')
+    schedule_distros_str = args.schedule_distros or os.environ.get('SCHEDULE_DISTROS', 'debian,ubuntu,arch,fedora,linuxmint,rocky')
     
     if schedule_distros_str and schedule_distros_str.lower() != 'disabled':
         schedule_distros = [d.strip() for d in schedule_distros_str.split(',')]

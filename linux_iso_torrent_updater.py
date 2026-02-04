@@ -272,6 +272,354 @@ class RaspberryPiOSTorrentFinder(DistroTorrentFinder):
         return None
 
 
+class LinuxMintTorrentFinder(DistroTorrentFinder):
+    """Find latest Linux Mint torrent from LinuxTracker.org."""
+    
+    def __init__(self):
+        super().__init__("Linux Mint")
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=mint+cinnamon&order=3&by=2"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access LinuxTracker for Linux Mint torrents")
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for Linux Mint Cinnamon x86_64 torrent (most popular edition)
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                title = str(link.get('title', ''))
+                
+                # Look for Cinnamon edition (flagship), excluding beta releases
+                if ('linuxmint' in title.lower() and 
+                    'cinnamon' in title.lower() and
+                    ('64bit' in title.lower() or '64-bit' in title.lower()) and
+                    'beta' not in title.lower() and
+                    'torrent-details' in href):
+                    
+                    if 'id=' in href:
+                        torrent_id = href.split('id=')[1].split('&')[0]
+                        torrent_url = f"https://linuxtracker.org/download.php?id={torrent_id}"
+                        logger.info(f"Found Linux Mint torrent: {torrent_url}")
+                        return torrent_url
+                        
+        except Exception as e:
+            logger.error(f"Error finding Linux Mint torrent: {e}")
+        
+        return None
+
+
+class FedoraTorrentFinder(DistroTorrentFinder):
+    """Find latest Fedora Workstation torrent."""
+    
+    def __init__(self):
+        super().__init__("Fedora")
+        self.base_url = "https://torrent.fedoraproject.org/"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access Fedora torrent server")
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Find the latest Fedora Workstation Live x86_64 torrent
+            # Look for links with 'Workstation' and 'x86_64' in the filename
+            latest_version = None
+            latest_url = None
+            
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                
+                if ('Fedora-Workstation-Live-x86_64' in href and 
+                    href.endswith('.torrent')):
+                    
+                    # Extract version number (e.g., Fedora-Workstation-Live-x86_64-43.torrent)
+                    try:
+                        version = int(href.split('-')[-1].replace('.torrent', ''))
+                        if latest_version is None or version > latest_version:
+                            latest_version = version
+                            latest_url = urljoin(self.base_url, href)
+                    except ValueError:
+                        continue
+            
+            if latest_url:
+                logger.info(f"Found Fedora Workstation torrent: {latest_url}")
+                return latest_url
+                        
+        except Exception as e:
+            logger.error(f"Error finding Fedora torrent: {e}")
+        
+        return None
+
+
+class PopOSTorrentFinder(DistroTorrentFinder):
+    """Find latest Pop!_OS torrent from LinuxTracker.org."""
+    
+    def __init__(self):
+        super().__init__("Pop!_OS")
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=pop+os&order=3&by=2"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access LinuxTracker for Pop!_OS torrents")
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for Pop!_OS AMD64/Intel torrent
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                title = str(link.get('title', ''))
+                
+                if ('pop' in title.lower() and 
+                    ('amd64' in title.lower() or 'intel' in title.lower()) and
+                    'torrent-details' in href):
+                    
+                    if 'id=' in href:
+                        torrent_id = href.split('id=')[1].split('&')[0]
+                        torrent_url = f"https://linuxtracker.org/download.php?id={torrent_id}"
+                        logger.info(f"Found Pop!_OS torrent: {torrent_url}")
+                        return torrent_url
+                        
+        except Exception as e:
+            logger.error(f"Error finding Pop!_OS torrent: {e}")
+        
+        return None
+
+
+class RockyLinuxTorrentFinder(DistroTorrentFinder):
+    """Find latest Rocky Linux torrent from LinuxTracker.org."""
+    
+    def __init__(self):
+        super().__init__("Rocky Linux")
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=rocky+linux&order=3&by=2"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access LinuxTracker for Rocky Linux torrents")
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for Rocky Linux x86_64 DVD torrent
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                title = str(link.get('title', ''))
+                
+                if ('rocky' in title.lower() and 
+                    'x86_64' in title.lower() and
+                    ('dvd' in title.lower() or 'dvd1' in title.lower()) and
+                    'torrent-details' in href):
+                    
+                    if 'id=' in href:
+                        torrent_id = href.split('id=')[1].split('&')[0]
+                        torrent_url = f"https://linuxtracker.org/download.php?id={torrent_id}"
+                        logger.info(f"Found Rocky Linux torrent: {torrent_url}")
+                        return torrent_url
+                        
+        except Exception as e:
+            logger.error(f"Error finding Rocky Linux torrent: {e}")
+        
+        return None
+
+
+class AlmaLinuxTorrentFinder(DistroTorrentFinder):
+    """Find latest AlmaLinux torrent from LinuxTracker.org."""
+    
+    def __init__(self):
+        super().__init__("AlmaLinux")
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=almalinux&order=3&by=2"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access LinuxTracker for AlmaLinux torrents")
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for AlmaLinux x86_64 DVD torrent
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                title = str(link.get('title', ''))
+                
+                if ('almalinux' in title.lower() and 
+                    'x86_64' in title.lower() and
+                    ('dvd' in title.lower() or 'dvd1' in title.lower()) and
+                    'torrent-details' in href):
+                    
+                    if 'id=' in href:
+                        torrent_id = href.split('id=')[1].split('&')[0]
+                        torrent_url = f"https://linuxtracker.org/download.php?id={torrent_id}"
+                        logger.info(f"Found AlmaLinux torrent: {torrent_url}")
+                        return torrent_url
+                        
+        except Exception as e:
+            logger.error(f"Error finding AlmaLinux torrent: {e}")
+        
+        return None
+
+
+class ManjaroTorrentFinder(DistroTorrentFinder):
+    """Find latest Manjaro torrent from LinuxTracker.org."""
+    
+    def __init__(self):
+        super().__init__("Manjaro")
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=manjaro+kde&order=3&by=2"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access LinuxTracker for Manjaro torrents")
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for Manjaro KDE x86_64 torrent (most popular edition)
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                title = str(link.get('title', ''))
+                
+                if ('manjaro' in title.lower() and 
+                    'kde' in title.lower() and
+                    'x86_64' in title.lower() and
+                    'torrent-details' in href):
+                    
+                    if 'id=' in href:
+                        torrent_id = href.split('id=')[1].split('&')[0]
+                        torrent_url = f"https://linuxtracker.org/download.php?id={torrent_id}"
+                        logger.info(f"Found Manjaro torrent: {torrent_url}")
+                        return torrent_url
+                        
+        except Exception as e:
+            logger.error(f"Error finding Manjaro torrent: {e}")
+        
+        return None
+
+
+class ElementaryOSTorrentFinder(DistroTorrentFinder):
+    """Find latest elementary OS torrent from LinuxTracker.org."""
+    
+    def __init__(self):
+        super().__init__("elementary OS")
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=elementary&order=3&by=2"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access LinuxTracker for elementary OS torrents")
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for elementary OS torrent
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                title = str(link.get('title', ''))
+                
+                if ('elementary' in title.lower() and 
+                    'torrent-details' in href and
+                    'beta' not in title.lower()):
+                    
+                    if 'id=' in href:
+                        torrent_id = href.split('id=')[1].split('&')[0]
+                        torrent_url = f"https://linuxtracker.org/download.php?id={torrent_id}"
+                        logger.info(f"Found elementary OS torrent: {torrent_url}")
+                        return torrent_url
+                        
+        except Exception as e:
+            logger.error(f"Error finding elementary OS torrent: {e}")
+        
+        return None
+
+
+class ZorinOSTorrentFinder(DistroTorrentFinder):
+    """Find latest Zorin OS torrent from LinuxTracker.org."""
+    
+    def __init__(self):
+        super().__init__("Zorin OS")
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=zorin&order=3&by=2"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access LinuxTracker for Zorin OS torrents")
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for Zorin OS Core torrent (free edition)
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                title = str(link.get('title', ''))
+                
+                if ('zorin' in title.lower() and 
+                    'core' in title.lower() and
+                    '64' in title.lower() and
+                    'torrent-details' in href):
+                    
+                    if 'id=' in href:
+                        torrent_id = href.split('id=')[1].split('&')[0]
+                        torrent_url = f"https://linuxtracker.org/download.php?id={torrent_id}"
+                        logger.info(f"Found Zorin OS torrent: {torrent_url}")
+                        return torrent_url
+                        
+        except Exception as e:
+            logger.error(f"Error finding Zorin OS torrent: {e}")
+        
+        return None
+
+
+class EndeavourOSTorrentFinder(DistroTorrentFinder):
+    """Find latest EndeavourOS torrent from LinuxTracker.org."""
+    
+    def __init__(self):
+        super().__init__("EndeavourOS")
+        self.base_url = "https://linuxtracker.org/index.php?page=torrents&search=endeavouros&order=3&by=2"
+        
+    def get_latest_torrent_url(self) -> Optional[str]:
+        try:
+            response = requests.get(self.base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Could not access LinuxTracker for EndeavourOS torrents")
+                return None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Look for EndeavourOS torrent
+            for link in soup.find_all('a', href=True):
+                href = str(link['href'])
+                title = str(link.get('title', ''))
+                
+                if ('endeavour' in title.lower() and 
+                    'torrent-details' in href):
+                    
+                    if 'id=' in href:
+                        torrent_id = href.split('id=')[1].split('&')[0]
+                        torrent_url = f"https://linuxtracker.org/download.php?id={torrent_id}"
+                        logger.info(f"Found EndeavourOS torrent: {torrent_url}")
+                        return torrent_url
+                        
+        except Exception as e:
+            logger.error(f"Error finding EndeavourOS torrent: {e}")
+        
+        return None
+
+
 class TransmissionTorrentManager:
     """Manage torrents in Transmission."""
     
@@ -293,6 +641,15 @@ class TransmissionTorrentManager:
             'ubuntu': UbuntuTorrentFinder(),
             'arch': ArchTorrentFinder(),
             'raspberrypi': RaspberryPiOSTorrentFinder(),
+            'linuxmint': LinuxMintTorrentFinder(),
+            'fedora': FedoraTorrentFinder(),
+            'popos': PopOSTorrentFinder(),
+            'rocky': RockyLinuxTorrentFinder(),
+            'alma': AlmaLinuxTorrentFinder(),
+            'manjaro': ManjaroTorrentFinder(),
+            'elementary': ElementaryOSTorrentFinder(),
+            'zorin': ZorinOSTorrentFinder(),
+            'endeavour': EndeavourOSTorrentFinder(),
         }
         
     def get_torrent_hash(self, torrent_url: str) -> Optional[str]:
@@ -319,6 +676,15 @@ class TransmissionTorrentManager:
                 'ubuntu': ['ubuntu'],
                 'arch': ['arch', 'archlinux'],
                 'raspberrypi': ['raspios', 'raspberry', 'raspberrypi'],
+                'linuxmint': ['linuxmint', 'mint'],
+                'fedora': ['fedora'],
+                'popos': ['pop-os', 'pop_os', 'popos'],
+                'rocky': ['rocky'],
+                'alma': ['alma', 'almalinux'],
+                'manjaro': ['manjaro'],
+                'elementary': ['elementary'],
+                'zorin': ['zorin'],
+                'endeavour': ['endeavour', 'endeavouros'],
             }
             
             patterns = name_patterns.get(distro_name.lower(), [distro_name])
