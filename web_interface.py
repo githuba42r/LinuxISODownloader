@@ -167,42 +167,72 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                 existing_torrent = manager.find_existing_torrent(distro)
                 
                 if existing_torrent:
-                    # We have a torrent for this distro - need to check if it's the same
-                    # Download the new torrent to compare
+                    # We have a torrent for this distro - download new torrent and compare
                     try:
                         import requests
-                        import hashlib
+                        import transmission_rpc
                         response = requests.get(torrent_url, timeout=30)
-                        if response.status_code == 200:
-                            new_torrent_data = response.content
-                            new_hash = hashlib.sha256(new_torrent_data).hexdigest()
-                            
-                            # Try to determine if update is needed by checking torrent name
-                            # (We can't easily get the hash of existing torrent without downloading it again)
-                            results[distro] = {
-                                'success': True,
-                                'url': torrent_url,
-                                'existing_torrent': existing_torrent.name,
-                                'existing_id': existing_torrent.id,
-                                'status': 'needs_comparison',
-                                'message': f'Found new torrent, need to compare with existing: {existing_torrent.name}',
-                                'checked_at': datetime.now().isoformat()
-                            }
-                        else:
+                        if response.status_code != 200:
                             results[distro] = {
                                 'success': False,
                                 'error': f'Failed to download torrent from {torrent_url}',
                                 'status': 'error'
                             }
+                            continue
+                        
+                        new_torrent_data = response.content
+                        
+                        # Try to add the torrent - Transmission will detect if it's a duplicate
+                        try:
+                            new_torrent = manager.client.add_torrent(new_torrent_data)
+                            
+                            # Check if it's the same torrent or a different one
+                            if new_torrent.id != existing_torrent.id:
+                                # Different torrent - update is available!
+                                # Remove the newly added one (we only wanted to check)
+                                manager.client.remove_torrent(new_torrent.id, delete_data=True)
+                                
+                                results[distro] = {
+                                    'success': True,
+                                    'url': torrent_url,
+                                    'existing_torrent': existing_torrent.name,
+                                    'new_torrent': new_torrent.name,
+                                    'status': 'update_available',
+                                    'message': f'Update available! Current: {existing_torrent.name}',
+                                    'checked_at': datetime.now().isoformat()
+                                }
+                            else:
+                                # Same torrent ID - already up to date
+                                results[distro] = {
+                                    'success': True,
+                                    'url': torrent_url,
+                                    'existing_torrent': existing_torrent.name,
+                                    'status': 'up_to_date',
+                                    'message': f'Already up to date: {existing_torrent.name}',
+                                    'checked_at': datetime.now().isoformat()
+                                }
+                        
+                        except transmission_rpc.error.TransmissionError as e:
+                            if "duplicate" in str(e).lower():
+                                # Duplicate error means same torrent - already up to date
+                                results[distro] = {
+                                    'success': True,
+                                    'url': torrent_url,
+                                    'existing_torrent': existing_torrent.name,
+                                    'status': 'up_to_date',
+                                    'message': f'Already up to date: {existing_torrent.name}',
+                                    'checked_at': datetime.now().isoformat()
+                                }
+                            else:
+                                raise
+                    
                     except Exception as e:
-                        logger.error(f"Error downloading torrent for comparison: {e}")
+                        logger.error(f"Error comparing torrents for {distro}: {e}")
                         results[distro] = {
-                            'success': True,
-                            'url': torrent_url,
+                            'success': False,
+                            'error': str(e),
                             'existing_torrent': existing_torrent.name,
-                            'status': 'found_with_existing',
-                            'message': f'Found torrent URL, existing: {existing_torrent.name}',
-                            'checked_at': datetime.now().isoformat()
+                            'status': 'error'
                         }
                 else:
                     # No existing torrent - this is a new one
@@ -392,12 +422,12 @@ def api_check_status():
                 message = f"Error: {result.get('error', 'Unknown error')}"
             elif result_status == 'new':
                 message = f"New torrent available (not in Transmission yet)"
-            elif result_status == 'found_with_existing':
+            elif result_status == 'up_to_date':
                 existing = result.get('existing_torrent', 'unknown')
-                message = f"Found torrent. Current in Transmission: {existing}"
-            elif result_status == 'needs_comparison':
+                message = f"Already up to date: {existing}"
+            elif result_status == 'update_available':
                 existing = result.get('existing_torrent', 'unknown')
-                message = f"Found torrent. Compare with existing: {existing}"
+                message = f"Update available! Current: {existing}"
             elif result.get('success'):
                 message = f"Found torrent: {result.get('url', 'N/A')}"
             else:
@@ -407,6 +437,7 @@ def api_check_status():
                 'distro': distro,
                 'message': message,
                 'success': result.get('success', False),
+                'status': result_status,
                 'url': result.get('url'),
                 'existing_torrent': result.get('existing_torrent')
             })
