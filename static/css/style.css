@@ -168,7 +168,9 @@ h1 {
 }
 
 .distro-logo {
-    font-size: 48px;
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
     margin-bottom: 10px;
     transition: transform 0.3s;
 }

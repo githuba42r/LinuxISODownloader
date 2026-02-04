@@ -541,36 +541,36 @@ def api_config():
 @app.route('/api/distros')
 def api_distros():
     """Get list of available distributions with display info and default selection."""
-    # Distro metadata with display names and emoji logos
+    # Distro metadata with display names and logo URLs from official sources
     distro_info = {
         'centos': {
             'id': 'centos',
             'name': 'CentOS Stream',
-            'emoji': '🟣',  # Purple circle for CentOS
+            'logo': 'https://www.centos.org/assets/img/logo-centos.png',
             'color': '#932279'
         },
         'debian': {
             'id': 'debian',
             'name': 'Debian',
-            'emoji': '🔴',  # Red circle for Debian
+            'logo': 'https://www.debian.org/logos/openlogo-nd.svg',
             'color': '#D70A53'
         },
         'ubuntu': {
             'id': 'ubuntu',
             'name': 'Ubuntu',
-            'emoji': '🟠',  # Orange circle for Ubuntu
+            'logo': 'https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png',
             'color': '#E95420'
         },
         'arch': {
             'id': 'arch',
             'name': 'Arch Linux',
-            'emoji': '🔵',  # Blue circle for Arch
+            'logo': 'https://archlinux.org/static/logos/archlinux-logo-dark-90dpi.ebdee92a15b3.png',
             'color': '#1793D1'
         },
         'raspberrypi': {
             'id': 'raspberrypi',
             'name': 'Raspberry Pi OS',
-            'emoji': '🍓',  # Raspberry for Raspberry Pi
+            'logo': 'https://www.raspberrypi.com/app/uploads/2022/02/COLOUR-Raspberry-Pi-Symbol-Registered.png',
             'color': '#C51A4A'
         }
     }

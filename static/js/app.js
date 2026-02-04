@@ -37,7 +37,7 @@ async function loadDistros() {
             badge.style.setProperty('--distro-color', distro.color);
             
             badge.innerHTML = `
-                <div class="distro-logo">${distro.emoji}</div>
+                <img src="${distro.logo}" alt="${distro.name}" class="distro-logo" onerror="this.style.display='none'">
                 <div class="distro-name">${distro.name}</div>
             `;
             
