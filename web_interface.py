@@ -719,49 +719,49 @@ def api_distros():
         'fedora': {
             'id': 'fedora',
             'name': 'Fedora Workstation',
-            'logo': 'https://fedoraproject.org/assets/images/fedora-workstation-logo.png',
+            'logo': 'https://cdn.simpleicons.org/fedora/51A2DA',
             'color': '#51A2DA'
         },
         'popos': {
             'id': 'popos',
             'name': 'Pop!_OS',
-            'logo': 'https://pop.system76.com/icon.svg',
+            'logo': 'https://cdn.simpleicons.org/popos/48B9C7',
             'color': '#48B9C7'
         },
         'rocky': {
             'id': 'rocky',
             'name': 'Rocky Linux',
-            'logo': 'https://rockylinux.org/images/rocky-logo.svg',
+            'logo': 'https://cdn.simpleicons.org/rockylinux/10B981',
             'color': '#10B981'
         },
         'alma': {
             'id': 'alma',
             'name': 'AlmaLinux',
-            'logo': 'https://almalinux.org/images/logo.svg',
+            'logo': 'https://cdn.simpleicons.org/almalinux/0F4266',
             'color': '#0F4266'
         },
         'manjaro': {
             'id': 'manjaro',
             'name': 'Manjaro',
-            'logo': 'https://manjaro.org/img/logo.svg',
+            'logo': 'https://cdn.simpleicons.org/manjaro/35BF5C',
             'color': '#35BF5C'
         },
         'elementary': {
             'id': 'elementary',
             'name': 'elementary OS',
-            'logo': 'https://elementary.io/images/favicon.svg',
+            'logo': 'https://cdn.simpleicons.org/elementary/64BAFF',
             'color': '#64BAFF'
         },
         'zorin': {
             'id': 'zorin',
             'name': 'Zorin OS',
-            'logo': 'https://assets.zorincdn.com/images/logo.svg',
+            'logo': 'https://cdn.simpleicons.org/zorin/15A6F0',
             'color': '#15A6F0'
         },
         'endeavour': {
             'id': 'endeavour',
             'name': 'EndeavourOS',
-            'logo': 'https://endeavouros.com/wp-content/uploads/2021/03/endeavouros-icon.png',
+            'logo': 'https://cdn.simpleicons.org/endeavouros/7F7FFF',
             'color': '#7F7FFF'
         }
     }
@@ -903,8 +903,8 @@ def main():
     parser.add_argument('--log-file', '-l', help='Path to log file (default: console only)')
     parser.add_argument('--schedule-time', default=None, 
                         help='Time to run automatic checks in HH:MM format (24-hour), e.g., "02:00" for 2am. Use "disabled" to disable scheduling. (default: from env or 02:00)')
-    parser.add_argument('--schedule-distros', default=None,
-                        help='Comma-separated list of distributions for scheduled checks (default: from env or all)')
+    parser.add_argument('--select-distros', default=None,
+                        help='Comma-separated list of distributions to select by default in web interface (default: from env or all)')
     
     args = parser.parse_args()
     
@@ -923,16 +923,18 @@ def main():
     
     # Configure scheduler
     schedule_time = args.schedule_time or os.environ.get('SCHEDULE_TIME', '02:00')
-    schedule_distros_str = args.schedule_distros or os.environ.get('SCHEDULE_DISTROS', 'debian,ubuntu,arch,fedora,linuxmint,rocky')
+    select_distros_str = args.select_distros or os.environ.get('SELECT_DISTROS', 'debian,ubuntu,arch,fedora,linuxmint,rocky')
     
-    if schedule_distros_str and schedule_distros_str.lower() != 'disabled':
-        schedule_distros = [d.strip() for d in schedule_distros_str.split(',')]
+    # Set the global scheduled_distros for both scheduler AND web interface default selection
+    global scheduled_distros
+    if select_distros_str and select_distros_str.lower() != 'disabled':
+        scheduled_distros = [d.strip() for d in select_distros_str.split(',')]
     else:
-        schedule_distros = []
+        scheduled_distros = []
     
     # Setup scheduler if enabled
     if schedule_time.lower() != 'disabled':
-        if not setup_scheduler(schedule_time, schedule_distros):
+        if not setup_scheduler(schedule_time, scheduled_distros):
             logger.warning("Failed to setup scheduler, continuing without automatic checks")
     else:
         logger.info("Automatic scheduling disabled")
