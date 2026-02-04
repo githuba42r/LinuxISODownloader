@@ -209,9 +209,7 @@ async function checkForUpdates() {
             return;
         }
         
-        showMessage('info', data.message);
-        
-        // Start polling for status
+        // Start polling for status (status badge will show in-progress state)
         startStatusCheck();
         
     } catch (error) {
