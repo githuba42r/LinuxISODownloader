@@ -234,31 +234,53 @@ function updateTorrentsList(torrents) {
         const progress = torrent.percentDone * 100;
         const status = getTorrentStatus(torrent);
         
-        item.innerHTML = `
-            <h3>${torrent.name}</h3>
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: ${progress}%"></div>
-                <div class="progress-text">${progress.toFixed(1)}%</div>
+        // Build stats items dynamically
+        let statsHTML = `
+            <div class="torrent-info-item">
+                <strong>Status:</strong> ${status}
             </div>
-            <div class="torrent-info">
-                <div class="torrent-info-item">
-                    <strong>Status:</strong> ${status}
-                </div>
-                <div class="torrent-info-item">
-                    <strong>Size:</strong> ${formatBytes(torrent.totalSize)}
-                </div>
-                <div class="torrent-info-item">
-                    <strong>Downloaded:</strong> ${formatBytes(torrent.downloadedEver)}
-                </div>
+            <div class="torrent-info-item">
+                <strong>Progress:</strong> ${progress.toFixed(1)}%
+            </div>
+            <div class="torrent-info-item">
+                <strong>Size:</strong> ${formatBytes(torrent.totalSize)}
+            </div>
+            <div class="torrent-info-item">
+                <strong>Downloaded:</strong> ${formatBytes(torrent.downloadedEver)}
+            </div>`;
+        
+        // Show download speed and ETA only when downloading
+        if (torrent.status === 4 && torrent.rateDownload > 0) {
+            statsHTML += `
                 <div class="torrent-info-item">
                     <strong>Down Speed:</strong> ${formatSpeed(torrent.rateDownload)}
                 </div>
                 <div class="torrent-info-item">
-                    <strong>Up Speed:</strong> ${formatSpeed(torrent.rateUpload)}
-                </div>
+                    <strong>ETA:</strong> ${formatETA(torrent.eta)}
+                </div>`;
+        } else {
+            statsHTML += `
                 <div class="torrent-info-item">
-                    <strong>Ratio:</strong> ${torrent.uploadRatio.toFixed(2)}
-                </div>
+                    <strong>Down Speed:</strong> ${formatSpeed(torrent.rateDownload)}
+                </div>`;
+        }
+        
+        statsHTML += `
+            <div class="torrent-info-item">
+                <strong>Up Speed:</strong> ${formatSpeed(torrent.rateUpload)}
+            </div>
+            <div class="torrent-info-item">
+                <strong>Ratio:</strong> ${torrent.uploadRatio.toFixed(2)}
+            </div>`;
+        
+        item.innerHTML = `
+            <h3>${torrent.name}</h3>
+            <div class="progress-bar" title="${progress.toFixed(1)}% complete">
+                <div class="progress-fill" style="width: ${progress}%"></div>
+                <div class="progress-text">${progress.toFixed(1)}%</div>
+            </div>
+            <div class="torrent-info">
+                ${statsHTML}
             </div>
         `;
         
@@ -446,6 +468,31 @@ function formatBytes(bytes) {
 function formatSpeed(bytesPerSecond) {
     if (bytesPerSecond === 0) return '0 B/s';
     return formatBytes(bytesPerSecond) + '/s';
+}
+
+function formatETA(seconds) {
+    if (seconds === null || seconds === undefined || seconds < 0) {
+        return 'Unknown';
+    }
+    
+    if (seconds === 0) {
+        return 'Done';
+    }
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 24) {
+        const days = Math.floor(hours / 24);
+        return `${days}d ${hours % 24}h`;
+    } else if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${secs}s`;
+    } else {
+        return `${secs}s`;
+    }
 }
 
 // Settings Modal Functions

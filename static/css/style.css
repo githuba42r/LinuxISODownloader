@@ -372,6 +372,13 @@ button:disabled {
     overflow: hidden;
     margin-top: 10px;
     position: relative;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.progress-bar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .progress-fill {
@@ -384,6 +391,10 @@ button:disabled {
     color: white;
     font-weight: 600;
     font-size: 0.85em;
+}
+
+.progress-bar:hover .progress-fill {
+    background: linear-gradient(90deg, #5568d3 0%, #663a8b 100%);
 }
 
 .progress-text {
