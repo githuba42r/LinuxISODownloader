@@ -540,10 +540,55 @@ def api_config():
 
 @app.route('/api/distros')
 def api_distros():
-    """Get list of available distributions."""
-    distros = ['centos', 'debian', 'ubuntu', 'arch', 'raspberrypi']
+    """Get list of available distributions with display info and default selection."""
+    # Distro metadata with display names and emoji logos
+    distro_info = {
+        'centos': {
+            'id': 'centos',
+            'name': 'CentOS Stream',
+            'emoji': '🟣',  # Purple circle for CentOS
+            'color': '#932279'
+        },
+        'debian': {
+            'id': 'debian',
+            'name': 'Debian',
+            'emoji': '🔴',  # Red circle for Debian
+            'color': '#D70A53'
+        },
+        'ubuntu': {
+            'id': 'ubuntu',
+            'name': 'Ubuntu',
+            'emoji': '🟠',  # Orange circle for Ubuntu
+            'color': '#E95420'
+        },
+        'arch': {
+            'id': 'arch',
+            'name': 'Arch Linux',
+            'emoji': '🔵',  # Blue circle for Arch
+            'color': '#1793D1'
+        },
+        'raspberrypi': {
+            'id': 'raspberrypi',
+            'name': 'Raspberry Pi OS',
+            'emoji': '🍓',  # Raspberry for Raspberry Pi
+            'color': '#C51A4A'
+        }
+    }
+    
+    # Get default selected distros from scheduled config
+    # If no scheduled distros configured, default to all
+    default_selected = scheduled_distros if scheduled_distros else list(distro_info.keys())
+    
+    distros = []
+    for distro_id, info in distro_info.items():
+        distros.append({
+            **info,
+            'selected': distro_id in default_selected
+        })
+    
     return jsonify({
-        'distros': distros
+        'distros': distros,
+        'default_selected': default_selected
     })
 
 

@@ -24,29 +24,29 @@ async function loadDistros() {
         container.innerHTML = '';
         
         data.distros.forEach(distro => {
-            const item = document.createElement('div');
-            item.className = 'distro-item';
+            const badge = document.createElement('div');
+            badge.className = 'distro-badge';
+            badge.dataset.distro = distro.id;
             
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = `distro-${distro}`;
-            checkbox.value = distro;
-            checkbox.className = 'distro-checkbox';
+            // Set selected state from backend default
+            if (distro.selected) {
+                badge.classList.add('selected');
+            }
             
-            const label = document.createElement('label');
-            label.htmlFor = `distro-${distro}`;
-            label.textContent = formatDistroName(distro);
+            // Set custom color
+            badge.style.setProperty('--distro-color', distro.color);
             
-            item.appendChild(checkbox);
-            item.appendChild(label);
-            container.appendChild(item);
+            badge.innerHTML = `
+                <div class="distro-logo">${distro.emoji}</div>
+                <div class="distro-name">${distro.name}</div>
+            `;
             
-            // Make the whole div clickable
-            item.addEventListener('click', function(e) {
-                if (e.target !== checkbox) {
-                    checkbox.checked = !checkbox.checked;
-                }
+            // Toggle selection on click
+            badge.addEventListener('click', function() {
+                this.classList.toggle('selected');
             });
+            
+            container.appendChild(badge);
         });
     } catch (error) {
         console.error('Error loading distros:', error);
@@ -54,7 +54,7 @@ async function loadDistros() {
     }
 }
 
-// Format distro name for display
+// Format distro name for display (kept for backwards compatibility)
 function formatDistroName(distro) {
     const names = {
         'centos': 'CentOS Stream',
@@ -68,16 +68,20 @@ function formatDistroName(distro) {
 
 // Select all distros
 function selectAllDistros() {
-    const checkboxes = document.querySelectorAll('.distro-checkbox');
-    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    const badges = document.querySelectorAll('.distro-badge');
+    const allSelected = Array.from(badges).every(badge => badge.classList.contains('selected'));
     
-    checkboxes.forEach(cb => {
-        cb.checked = !allChecked;
+    badges.forEach(badge => {
+        if (allSelected) {
+            badge.classList.remove('selected');
+        } else {
+            badge.classList.add('selected');
+        }
     });
     
     // Update button text
     const btn = document.getElementById('select-all-btn');
-    btn.textContent = allChecked ? 'Select All' : 'Deselect All';
+    btn.textContent = allSelected ? 'Select All' : 'Deselect All';
 }
 
 // Update status display
@@ -185,8 +189,8 @@ async function checkForUpdates() {
         return;
     }
     
-    const selectedDistros = Array.from(document.querySelectorAll('.distro-checkbox:checked'))
-        .map(cb => cb.value);
+    const selectedDistros = Array.from(document.querySelectorAll('.distro-badge.selected'))
+        .map(badge => badge.dataset.distro);
     
     if (selectedDistros.length === 0) {
         showMessage('error', 'Please select at least one distribution');
