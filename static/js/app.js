@@ -344,6 +344,63 @@ function resetCheckButton() {
     btn.textContent = 'Check for Updates';
 }
 
+// Add event to history
+function addEvent(message, type = 'info') {
+    const timestamp = new Date();
+    eventHistory.unshift({
+        message,
+        type,
+        timestamp
+    });
+    
+    // Keep only last 200 events
+    if (eventHistory.length > MAX_EVENTS) {
+        eventHistory = eventHistory.slice(0, MAX_EVENTS);
+    }
+}
+
+// Render events in results container
+function renderEvents() {
+    const container = document.getElementById('results-container');
+    
+    if (eventHistory.length === 0) {
+        container.innerHTML = '<p>No events yet. Select distributions and click "Check for Updates".</p>';
+        return;
+    }
+    
+    // Show header with event count
+    const eventsToShow = eventHistory.slice(0, 20);
+    container.innerHTML = `
+        <h3 style="margin-bottom: 15px;">Events (${eventHistory.length} total, showing last ${eventsToShow.length})</h3>
+        <ul class="events-list"></ul>
+    `;
+    
+    const eventsList = container.querySelector('.events-list');
+    
+    eventsToShow.forEach(event => {
+        const item = document.createElement('li');
+        item.className = 'event-item';
+        
+        // Add type class for color coding
+        if (event.type === 'error') {
+            item.classList.add('event-error');
+        } else if (event.type === 'success') {
+            item.classList.add('event-success');
+        } else {
+            item.classList.add('event-info');
+        }
+        
+        const timeStr = formatTimestamp(event.timestamp);
+        
+        item.innerHTML = `
+            <span class="event-message">${event.message}</span>
+            <span class="event-time">${timeStr}</span>
+        `;
+        
+        eventsList.appendChild(item);
+    });
+}
+
 // Show message
 function showMessage(type, text) {
     const container = document.getElementById('message-container');
