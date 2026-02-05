@@ -298,9 +298,10 @@ Create `.vscode/settings.json`:
 | `TRANSMISSION_USER` | Yes | - | Transmission username |
 | `TRANSMISSION_PASS` | Yes | - | Transmission password |
 | `DISTROS` | No | All 14 distros | Comma-separated list of distros to update |
-| `SCHEDULE_ENABLED` | No | `true` | Enable/disable automatic checks (web interface only) |
-| `SCHEDULE_FREQUENCY` | No | `1d` | Frequency for automatic checks: 1h, 8h, 1d, 7d, 14d, 30d (web interface only) |
-| `SCHEDULE_TIME` | No | `02:00` | Time for daily+ checks in HH:MM format (web interface only) |
+| `WEB_ENABLED` | No | `false` | Enable web interface (Flask server). Set to `true` for web UI, `false` for CLI mode |
+| `SCHEDULE_ENABLED` | No | `true` | Enable/disable automatic checks (only works when WEB_ENABLED=true) |
+| `SCHEDULE_FREQUENCY` | No | `1d` | Frequency for automatic checks: 1h, 8h, 1d, 7d, 14d, 30d (only works when WEB_ENABLED=true) |
+| `SCHEDULE_TIME` | No | `02:00` | Time for daily+ checks in HH:MM format (only works when WEB_ENABLED=true) |
 | `SELECT_DISTROS` | No | All 14 distros | Comma-separated list of distros to select by default in web UI |
 | `LOG_FILE` | No | Console only | Path to log file |
 | `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |

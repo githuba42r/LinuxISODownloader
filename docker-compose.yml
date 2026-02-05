@@ -23,12 +23,13 @@ services:
     
     # Environment variables can be overridden here if needed
     # Uncomment and modify as needed:
-    # environment:
+    environment:
+      - WEB_ENABLED=true
     #   - SCHEDULE_TIME=03:00
     #   - SCHEDULE_DISTROS=debian,ubuntu
     
-    # Start in web mode
-    command: ["--web"]
+    # Start in web mode (using WEB_ENABLED=true environment variable)
+    # Alternative: use command: ["--web"] to override
     
     # Restart policy for web interface (keep running)
     restart: unless-stopped

@@ -23,6 +23,9 @@ services:
     # All configuration via environment variables
     # Set these in Portainer's Stack environment variables section
     environment:
+      # Web Interface Configuration (REQUIRED for web mode)
+      - WEB_ENABLED=${WEB_ENABLED:-true}
+      
       # Transmission RPC Configuration (REQUIRED)
       - TRANSMISSION_HOST=${TRANSMISSION_HOST:-localhost}
       - TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091}
@@ -69,6 +72,7 @@ services:
 # 1. In Portainer: Stacks → Add stack → Web editor
 # 2. Copy/paste this file
 # 3. Add environment variables (click "Add an environment variable"):
+#    - WEB_ENABLED = true
 #    - TRANSMISSION_HOST = localhost (or your Transmission hostname)
 #    - TRANSMISSION_PORT = 9091
 #    - TRANSMISSION_USER = your_username
@@ -79,6 +83,15 @@ services:
 #    - WEB_PORT = 8084
 # 4. Click "Deploy the stack"
 # 5. Access web interface at: http://your-server-ip:8084
+#
+# Configuration Options:
+#   WEB_ENABLED:
+#     true  = Run web interface (default, recommended for Portainer)
+#     false = Run CLI mode (one-time check)
+#
+#   SCHEDULE_ENABLED (only works when WEB_ENABLED=true):
+#     true  = Enable automatic checks (default)
+#     false = Disable automatic checks (manual only)
 #
 # Schedule Frequency Options:
 #   1h  = every hour

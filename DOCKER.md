@@ -23,11 +23,17 @@ docker build -t ghcr.io/githuba42r/linux-iso-updater:latest .
 The web interface provides a GUI for managing torrent updates and runs on **port 8084** by default.
 
 ```bash
-# Run web interface with host network
+# Run web interface with host network (using WEB_ENABLED environment variable)
 docker run --rm --network host --env-file .env \
-  linux-iso-updater:latest --web
+  -e WEB_ENABLED=true \
+  linux-iso-updater:latest
 
 # Run web interface with port mapping (alternative to host network)
+docker run --rm -p 8084:8084 --env-file .env \
+  -e WEB_ENABLED=true \
+  linux-iso-updater:latest
+
+# Alternative: Use --web command-line flag instead of WEB_ENABLED
 docker run --rm -p 8084:8084 --env-file .env \
   linux-iso-updater:latest --web
 
@@ -36,8 +42,9 @@ docker run --rm -p 8084:8084 --env-file .env \
 
 # Run web interface with custom port
 docker run --rm -p 8090:8084 --env-file .env \
+  -e WEB_ENABLED=true \
   -e WEB_PORT=8090 \
-  linux-iso-updater:latest --web --port 8090
+  linux-iso-updater:latest --port 8090
 
 # Run web interface with docker-compose
 docker-compose up web-interface
@@ -57,11 +64,13 @@ docker-compose logs -f web-interface
 - View real-time update logs
 - Monitor next scheduled check time
 
-**Port Configuration:**
-- Default port: **8084**
-- Environment variable: `WEB_PORT=8084` (in docker-compose.yml)
-- Command line: `--port 8090` (to use a different port)
-- Network mode: Use `--network host` for direct access, or `-p 8084:8084` for port mapping
+**Configuration:**
+- **Enable web interface**: Set `WEB_ENABLED=true` (default: false) OR use `--web` flag
+- **Port**: Default **8084**
+  - Environment variable: `WEB_PORT=8084`
+  - Command line: `--port 8090`
+- **Network mode**: Use `--network host` for direct access, or `-p 8084:8084` for port mapping
+- **Scheduling**: Only works when web interface is enabled (`WEB_ENABLED=true` or `--web`)
 
 ### CLI Mode
 
@@ -143,6 +152,7 @@ Portainer provides a web UI for managing Docker containers, making it easy to de
 3. **Paste the docker-compose.yml content** or use the Web editor
 4. **Add environment variables** in the "Environment variables" section:
    ```
+   WEB_ENABLED=true
    TRANSMISSION_HOST=your-transmission-host
    TRANSMISSION_PORT=9091
    TRANSMISSION_USER=your-username
@@ -159,6 +169,7 @@ Portainer provides a web UI for managing Docker containers, making it easy to de
 
 1. **Create your .env file locally** with your credentials:
    ```bash
+   WEB_ENABLED=true
    TRANSMISSION_HOST=localhost
    TRANSMISSION_PORT=9091
    TRANSMISSION_USER=your-username
@@ -189,6 +200,7 @@ services:
     ports:
       - "${WEB_PORT:-8084}:8084"
     environment:
+      - WEB_ENABLED=${WEB_ENABLED:-true}
       - TRANSMISSION_HOST=${TRANSMISSION_HOST:-localhost}
       - TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091}
       - TRANSMISSION_USER=${TRANSMISSION_USER}
@@ -206,6 +218,7 @@ services:
 ```
 
 **Then in Portainer's Stack environment variables, add:**
+- `WEB_ENABLED` = `true`
 - `TRANSMISSION_HOST` = `your-transmission-host`
 - `TRANSMISSION_PORT` = `9091`
 - `TRANSMISSION_USER` = `your-username`

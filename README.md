@@ -68,7 +68,10 @@ Then open http://localhost:8084 in your browser to:
 - Trigger manual update checks
 - Monitor download progress in real-time
 
-**Note:** There is no environment variable to enable the web interface. You enable it by running `web_interface.py` (native) or using the `--web` flag (Docker) or the `web-interface` service (docker-compose).
+The web interface can be enabled in three ways:
+1. **Environment variable** (Docker/Portainer): Set `WEB_ENABLED=true`
+2. **Command-line flag** (Docker/Native): Use `--web` flag
+3. **Direct execution** (Native): Run `python web_interface.py`
 
 ### CLI Mode (For Automation)
 
@@ -184,6 +187,7 @@ If you're using Portainer to manage Docker containers:
 2. **Name:** `linux-iso-updater`
 3. **Upload or paste** the `docker-compose.portainer.yml` file (or use the regular `docker-compose.yml`)
 4. **Add environment variables:**
+   - `WEB_ENABLED` = true
    - `TRANSMISSION_HOST` = your transmission host
    - `TRANSMISSION_PORT` = 9091
    - `TRANSMISSION_USER` = your username
@@ -432,11 +436,14 @@ When running the web interface, you can configure automatic torrent checks:
 
 ```bash
 # In .env file
-SCHEDULE_ENABLED=true                                    # Enable/disable automatic checks
+WEB_ENABLED=true                                         # Enable web interface (default: false)
+SCHEDULE_ENABLED=true                                    # Enable/disable automatic checks (default: true)
 SCHEDULE_FREQUENCY=1d                                    # Check frequency (1h/8h/1d/7d/14d/30d)
 SCHEDULE_TIME=02:00                                      # Time for daily+ checks (HH:MM format)
 SELECT_DISTROS=debian,ubuntu,arch,raspberrypi            # Distros selected by default in web UI
 ```
+
+**Important:** `SCHEDULE_ENABLED` only works when `WEB_ENABLED=true` (automatic checks require the web interface to run).
 
 **Frequency Options:**
 - `1h` - Check every hour
@@ -475,15 +482,17 @@ python web_interface.py --schedule-time 14:30 --select-distros debian,ubuntu
 docker run -d \
   -p 8084:8084 \
   --env-file .env \
+  -e WEB_ENABLED=true \
   -e SCHEDULE_ENABLED=true \
   -e SCHEDULE_FREQUENCY=1d \
   -e SCHEDULE_TIME=02:00 \
   -e SELECT_DISTROS=debian,ubuntu,arch \
-  linux-iso-updater:latest --web
+  linux-iso-updater:latest
 ```
 
-**Scheduling Options:**
-- **Enable/Disable**: Set `SCHEDULE_ENABLED=true` or `false` (default: true)
+**Configuration Options:**
+- **Web Interface**: Set `WEB_ENABLED=true` to run web server (default: false)
+- **Enable/Disable Scheduling**: Set `SCHEDULE_ENABLED=true` or `false` (default: true, requires WEB_ENABLED=true)
 - **Frequency**: `1h`, `8h`, `1d`, `7d`, `14d`, `30d` (default: 1d)
 - **Time**: `HH:MM` in 24-hour format for daily+ frequencies (default: 02:00)
 - **Distributions**: Comma-separated list to select by default in web UI
