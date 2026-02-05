@@ -11,11 +11,63 @@
 
 # Build manually
 docker build -t linux-iso-updater:latest .
+
+# Build with GitHub Container Registry tag
+docker build -t ghcr.io/githuba42r/linux-iso-updater:latest .
 ```
 
 ## Running the Container
 
-### One-time Execution
+### Web Interface
+
+The web interface provides a GUI for managing torrent updates and runs on **port 8084** by default.
+
+```bash
+# Run web interface with host network
+docker run --rm --network host --env-file .env \
+  linux-iso-updater:latest --web
+
+# Run web interface with port mapping (alternative to host network)
+docker run --rm -p 8084:8084 --env-file .env \
+  linux-iso-updater:latest --web
+
+# Access the web interface
+# Open http://localhost:8084 in your browser
+
+# Run web interface with custom port
+docker run --rm -p 8090:8084 --env-file .env \
+  -e WEB_PORT=8090 \
+  linux-iso-updater:latest --web --port 8090
+
+# Run web interface with docker-compose
+docker-compose up web-interface
+
+# Run web interface in background
+docker-compose up -d web-interface
+
+# View web interface logs
+docker-compose logs -f web-interface
+```
+
+**Web Interface Features:**
+- View status of all tracked distributions
+- Manually trigger updates for specific distributions
+- Configure automatic scheduling (frequency: 1h, 8h, 1d, 7d, 14d, 30d)
+- Enable/disable automatic checks
+- View real-time update logs
+- Monitor next scheduled check time
+
+**Port Configuration:**
+- Default port: **8084**
+- Environment variable: `WEB_PORT=8084` (in docker-compose.yml)
+- Command line: `--port 8090` (to use a different port)
+- Network mode: Use `--network host` for direct access, or `-p 8084:8084` for port mapping
+
+### CLI Mode
+
+### CLI Mode
+
+For one-time command-line execution without the web interface:
 
 ```bash
 # Normal run - using environment file
@@ -77,6 +129,192 @@ docker run -it --rm --network host --env-file .env \
 python /app/linux_iso_torrent_updater.py --dry-run
 python /app/linux_iso_torrent_updater.py --distro debian
 ```
+
+## Portainer Integration
+
+### Running in Portainer
+
+Portainer provides a web UI for managing Docker containers, making it easy to deploy and manage the Linux ISO Updater.
+
+#### Method 1: Using Docker Compose Stack (Recommended)
+
+1. **In Portainer, go to:** Stacks → Add stack
+2. **Name your stack:** `linux-iso-updater`
+3. **Paste the docker-compose.yml content** or use the Web editor
+4. **Add environment variables** in the "Environment variables" section:
+   ```
+   TRANSMISSION_HOST=your-transmission-host
+   TRANSMISSION_PORT=9091
+   TRANSMISSION_USER=your-username
+   TRANSMISSION_PASS=your-password
+   SCHEDULE_ENABLED=true
+   SCHEDULE_FREQUENCY=1d
+   SCHEDULE_TIME=02:00
+   SELECT_DISTROS=debian,ubuntu,arch,fedora,mint,rocky
+   WEB_PORT=8084
+   ```
+5. **Deploy the stack**
+
+#### Method 2: Using .env File Upload
+
+1. **Create your .env file locally** with your credentials:
+   ```bash
+   TRANSMISSION_HOST=localhost
+   TRANSMISSION_PORT=9091
+   TRANSMISSION_USER=your-username
+   TRANSMISSION_PASS=your-password
+   SCHEDULE_ENABLED=true
+   SCHEDULE_FREQUENCY=1d
+   SCHEDULE_TIME=02:00
+   SELECT_DISTROS=debian,ubuntu,arch
+   ```
+
+2. **In Portainer:**
+   - Go to: Stacks → Add stack
+   - Upload your docker-compose.yml
+   - Under "Upload a .env file", upload your .env file
+   - Deploy the stack
+
+#### Method 3: Using Portainer Environment Variables
+
+**Docker Compose for Portainer:**
+
+```yaml
+version: '3.8'
+
+services:
+  web-interface:
+    image: ghcr.io/githuba42r/linux-iso-updater:latest
+    container_name: linux-iso-updater-web
+    ports:
+      - "${WEB_PORT:-8084}:8084"
+    environment:
+      - TRANSMISSION_HOST=${TRANSMISSION_HOST:-localhost}
+      - TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091}
+      - TRANSMISSION_USER=${TRANSMISSION_USER}
+      - TRANSMISSION_PASS=${TRANSMISSION_PASS}
+      - SCHEDULE_ENABLED=${SCHEDULE_ENABLED:-true}
+      - SCHEDULE_FREQUENCY=${SCHEDULE_FREQUENCY:-1d}
+      - SCHEDULE_TIME=${SCHEDULE_TIME:-02:00}
+      - SELECT_DISTROS=${SELECT_DISTROS:-debian,ubuntu,arch,fedora,mint,rocky}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+```
+
+**Then in Portainer's Stack environment variables, add:**
+- `TRANSMISSION_HOST` = `your-transmission-host`
+- `TRANSMISSION_PORT` = `9091`
+- `TRANSMISSION_USER` = `your-username`
+- `TRANSMISSION_PASS` = `your-password`
+- `SCHEDULE_ENABLED` = `true`
+- `SCHEDULE_FREQUENCY` = `1d`
+- `SCHEDULE_TIME` = `02:00`
+- `WEB_PORT` = `8084`
+
+### Accessing the Web Interface in Portainer
+
+After deployment:
+1. Go to **Containers** in Portainer
+2. Find `linux-iso-updater-web`
+3. Click on the port **8084** link (if published)
+4. Or access directly: `http://your-server-ip:8084`
+
+### Managing the Container in Portainer
+
+**View Logs:**
+1. Go to Containers → linux-iso-updater-web
+2. Click "Logs" tab
+3. Enable "Auto-refresh" for real-time logs
+
+**Restart Container:**
+1. Go to Containers → linux-iso-updater-web
+2. Click "Restart" button
+
+**Update Container:**
+1. Go to Stacks → linux-iso-updater
+2. Click "Editor"
+3. Click "Pull and redeploy"
+4. Or use "Update the stack" to change configuration
+
+**Environment Variables:**
+1. Go to Stacks → linux-iso-updater
+2. Click "Editor"
+3. Modify environment variables
+4. Click "Update the stack"
+
+### Portainer Tips
+
+**Network Mode:**
+- If Transmission is on the same Docker host, use `network_mode: host` in your compose file
+- If Transmission is in another container, use a shared network or set `TRANSMISSION_HOST` to the container name
+
+**Accessing Local Transmission:**
+```yaml
+services:
+  web-interface:
+    # For local Transmission, use host network
+    network_mode: host
+    # OR
+    # Use bridge network and set TRANSMISSION_HOST to host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - TRANSMISSION_HOST=host.docker.internal
+```
+
+**Volume Persistence (optional):**
+```yaml
+services:
+  web-interface:
+    volumes:
+      # Persist logs
+      - ./logs:/logs
+    environment:
+      - LOG_FILE=/logs/updater.log
+```
+
+**Scheduled Updates in Portainer:**
+1. Enable automatic scheduling in the web interface (port 8084)
+2. Or use Portainer's webhook feature for external triggering
+3. The container will handle scheduling internally based on `SCHEDULE_FREQUENCY`
+
+### Portainer Webhook Integration
+
+To trigger updates via Portainer webhooks:
+
+1. **Enable webhook in Portainer:**
+   - Go to Containers → linux-iso-updater-web
+   - Click "Duplicate/Edit"
+   - Scroll to "Webhook"
+   - Enable webhook and copy the URL
+
+2. **Trigger updates externally:**
+   ```bash
+   # Restart container via webhook (triggers check on startup)
+   curl -X POST https://your-portainer-url/api/webhooks/your-webhook-id
+   ```
+
+### Troubleshooting in Portainer
+
+**Container won't start:**
+1. Check logs in Portainer: Containers → linux-iso-updater-web → Logs
+2. Verify environment variables are set correctly
+3. Check that Transmission is accessible from the container
+
+**Can't access web interface:**
+1. Verify port 8084 is published: Containers → linux-iso-updater-web → "Published Ports"
+2. Check firewall rules on your server
+3. Try accessing via server IP: `http://server-ip:8084`
+
+**Transmission connection failed:**
+1. Check `TRANSMISSION_HOST` - use container name if Transmission is in Docker
+2. Check `TRANSMISSION_PORT` - default is 9091
+3. Verify credentials are correct
+4. Check network mode (host vs bridge)
 
 ## Systemd Integration
 

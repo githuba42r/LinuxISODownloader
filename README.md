@@ -48,6 +48,8 @@ A Python application that automatically manages torrent files for the latest Lin
 
 ## Quick Start
 
+The application has **two run modes**: Web Interface (GUI) or CLI (command-line). You choose the mode when starting the application.
+
 ### Web Interface (Easiest)
 
 The web interface provides a user-friendly way to manage your Linux ISO torrents:
@@ -65,6 +67,8 @@ Then open http://localhost:8084 in your browser to:
 - View current torrent status
 - Trigger manual update checks
 - Monitor download progress in real-time
+
+**Note:** There is no environment variable to enable the web interface. You enable it by running `web_interface.py` (native) or using the `--web` flag (Docker) or the `web-interface` service (docker-compose).
 
 ### CLI Mode (For Automation)
 
@@ -115,8 +119,10 @@ TRANSMISSION_USER=your_username
 TRANSMISSION_PASS=your_password
 
 # Optional: Configure automatic scheduling (for web interface)
-SCHEDULE_TIME=02:00                                  # Check daily at 2am
-SELECT_DISTROS=debian,ubuntu,arch,raspberrypi        # Distros selected by default in web UI
+SCHEDULE_ENABLED=true                                    # Enable automatic checks
+SCHEDULE_FREQUENCY=1d                                    # Check daily
+SCHEDULE_TIME=02:00                                      # Check at 2am (for daily+ frequencies)
+SELECT_DISTROS=debian,ubuntu,arch,raspberrypi            # Distros selected by default in web UI
 ```
 
 ### 3. Run the Application
@@ -170,7 +176,29 @@ docker-compose run --rm linux-iso-updater --distros debian,ubuntu,arch
 docker-compose run --rm linux-iso-updater --dry-run
 ```
 
-### 4. Install Systemd Units (Docker)
+### 4. Portainer Setup (Alternative to Command Line)
+
+If you're using Portainer to manage Docker containers:
+
+1. **In Portainer:** Go to Stacks → Add stack
+2. **Name:** `linux-iso-updater`
+3. **Upload or paste** the `docker-compose.portainer.yml` file (or use the regular `docker-compose.yml`)
+4. **Add environment variables:**
+   - `TRANSMISSION_HOST` = your transmission host
+   - `TRANSMISSION_PORT` = 9091
+   - `TRANSMISSION_USER` = your username
+   - `TRANSMISSION_PASS` = your password
+   - `SCHEDULE_ENABLED` = true
+   - `SCHEDULE_FREQUENCY` = 1d
+   - `WEB_PORT` = 8084
+5. **Deploy the stack**
+6. **Access the web interface:** `http://your-server-ip:8084`
+
+**Note:** A Portainer-optimized docker-compose file is available: `docker-compose.portainer.yml`
+
+See [DOCKER.md](DOCKER.md#portainer-integration) for detailed Portainer documentation.
+
+### 5. Install Systemd Units (Docker)
 
 ```bash
 # Copy the systemd files
@@ -374,10 +402,13 @@ python web_interface.py --host 0.0.0.0 --port 8084
 python web_interface.py --debug
 
 # Configure automatic scheduling
-python web_interface.py --schedule-time 02:00 --select-distros debian,ubuntu,arch
+python web_interface.py --schedule-enabled true --schedule-frequency 1d --schedule-time 02:00
 
 # Disable automatic scheduling
-python web_interface.py --schedule-time disabled
+python web_interface.py --schedule-enabled false
+
+# Check every 8 hours
+python web_interface.py --schedule-frequency 8h
 
 # With log file
 python web_interface.py --log-file ~/logs/web-interface.log
@@ -387,7 +418,9 @@ python web_interface.py --log-file ~/logs/web-interface.log
 - `--host`: Host to bind to (default: 0.0.0.0)
 - `--port`: Port to bind to (default: 8084)
 - `--debug`: Enable Flask debug mode
-- `--schedule-time`: Time for automatic checks in HH:MM format (default: 02:00)
+- `--schedule-enabled`: Enable/disable automatic checks (true/false, default: true)
+- `--schedule-frequency`: Frequency for automatic checks (1h/8h/1d/7d/14d/30d, default: 1d)
+- `--schedule-time`: Time for automatic checks in HH:MM format (default: 02:00, only used for daily+ frequencies)
 - `--select-distros`: Distributions selected by default in web UI (comma-separated)
 - `--log-file`, `-l`: Path to log file (default: console only)
 
@@ -399,9 +432,36 @@ When running the web interface, you can configure automatic torrent checks:
 
 ```bash
 # In .env file
-SCHEDULE_TIME=02:00                                  # Check daily at 2am
-SELECT_DISTROS=debian,ubuntu,arch,raspberrypi        # Distros selected by default in web UI
+SCHEDULE_ENABLED=true                                    # Enable/disable automatic checks
+SCHEDULE_FREQUENCY=1d                                    # Check frequency (1h/8h/1d/7d/14d/30d)
+SCHEDULE_TIME=02:00                                      # Time for daily+ checks (HH:MM format)
+SELECT_DISTROS=debian,ubuntu,arch,raspberrypi            # Distros selected by default in web UI
 ```
+
+**Frequency Options:**
+- `1h` - Check every hour
+- `8h` - Check every 8 hours  
+- `1d` - Check daily (default)
+- `7d` - Check weekly
+- `14d` - Check every 2 weeks
+- `30d` - Check monthly
+
+**Via Command Line:**
+
+```bash
+# Enable with hourly checks
+python web_interface.py --schedule-enabled true --schedule-frequency 1h
+
+# Enable with daily checks at 2am
+python web_interface.py --schedule-enabled true --schedule-frequency 1d --schedule-time 02:00
+
+# Disable automatic checks
+python web_interface.py --schedule-enabled false
+```
+
+**Via Web UI:**
+
+You can also enable/disable automatic checks and change the frequency directly in the web interface settings menu.
 
 **Via Command-Line Arguments**:
 
@@ -415,19 +475,21 @@ python web_interface.py --schedule-time 14:30 --select-distros debian,ubuntu
 docker run -d \
   -p 8084:8084 \
   --env-file .env \
+  -e SCHEDULE_ENABLED=true \
+  -e SCHEDULE_FREQUENCY=1d \
   -e SCHEDULE_TIME=02:00 \
   -e SELECT_DISTROS=debian,ubuntu,arch \
   linux-iso-updater:latest --web
 ```
 
 **Scheduling Options:**
-- Time format: `HH:MM` in 24-hour format (e.g., `02:00` for 2am, `14:30` for 2:30pm)
-- Default time: `02:00` (2am local time)
-- To disable: Set `SCHEDULE_TIME=disabled` or `--schedule-time disabled`
-- Distributions: Comma-separated list of distributions to select by default in web UI
-- Default distros: debian,ubuntu,arch,centos,raspberrypi,mint,fedora,popos,rocky,alma,manjaro,elementary,zorin,endeavour
+- **Enable/Disable**: Set `SCHEDULE_ENABLED=true` or `false` (default: true)
+- **Frequency**: `1h`, `8h`, `1d`, `7d`, `14d`, `30d` (default: 1d)
+- **Time**: `HH:MM` in 24-hour format for daily+ frequencies (default: 02:00)
+- **Distributions**: Comma-separated list to select by default in web UI
+- **Default distros**: debian,ubuntu,arch,centos,raspberrypi,mint,fedora,popos,rocky,alma,manjaro,elementary,zorin,endeavour
 
-The scheduler runs in the background and automatically checks for new torrents at the specified time each day.
+The scheduler runs in the background and automatically checks for new torrents based on the configured frequency.
 
 ### Command Line Options
 

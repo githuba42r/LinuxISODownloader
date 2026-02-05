@@ -297,8 +297,12 @@ Create `.vscode/settings.json`:
 | `TRANSMISSION_PORT` | Yes | `9091` | Transmission RPC port |
 | `TRANSMISSION_USER` | Yes | - | Transmission username |
 | `TRANSMISSION_PASS` | Yes | - | Transmission password |
-| `SCHEDULE_TIME` | No | `02:00` | Time for automatic checks (web interface only, HH:MM format) |
+| `DISTROS` | No | All 14 distros | Comma-separated list of distros to update |
+| `SCHEDULE_ENABLED` | No | `true` | Enable/disable automatic checks (web interface only) |
+| `SCHEDULE_FREQUENCY` | No | `1d` | Frequency for automatic checks: 1h, 8h, 1d, 7d, 14d, 30d (web interface only) |
+| `SCHEDULE_TIME` | No | `02:00` | Time for daily+ checks in HH:MM format (web interface only) |
 | `SELECT_DISTROS` | No | All 14 distros | Comma-separated list of distros to select by default in web UI |
+| `LOG_FILE` | No | Console only | Path to log file |
 | `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
 
 ## Quick Reference

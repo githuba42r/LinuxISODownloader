@@ -22,6 +22,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+# Import version
+try:
+    from __version__ import __version__
+except ImportError:
+    __version__ = "unknown"
+
 # Import the torrent manager from the main script
 sys.path.insert(0, str(Path(__file__).parent))
 import linux_iso_torrent_updater
@@ -443,6 +449,49 @@ def setup_scheduler(schedule_time: str, distros: List[str]) -> bool:
     return True
 
 
+def setup_scheduler_with_trigger(trigger, distros, frequency_label='custom'):
+    """
+    Set up the background scheduler with a custom trigger.
+    
+    Args:
+        trigger: APScheduler trigger object (IntervalTrigger, CronTrigger, etc.)
+        distros: List of distributions to check
+        frequency_label: Human-readable label for the frequency (e.g., '1h', '8h', '1d')
+    
+    Returns:
+        True if scheduler was set up successfully
+    """
+    global scheduler, scheduled_distros
+    
+    if not distros:
+        logger.warning("No distributions provided for scheduler")
+        return False
+    
+    scheduled_distros = distros
+    
+    # Stop existing scheduler if running
+    if scheduler and scheduler.running:
+        logger.info("Stopping existing scheduler...")
+        scheduler.shutdown(wait=False)
+    
+    # Create new scheduler
+    scheduler = BackgroundScheduler()
+    
+    # Add job with the provided trigger
+    scheduler.add_job(
+        scheduled_check,
+        trigger=trigger,
+        id='torrent_check',
+        name=f'Automatic torrent check ({frequency_label})',
+        replace_existing=True
+    )
+    
+    scheduler.start()
+    logger.info(f"Scheduled automatic torrent checks ({frequency_label}) for: {', '.join(scheduled_distros)}")
+    
+    return True
+
+
 @app.route('/')
 def index():
     """Main page."""
@@ -798,11 +847,30 @@ def api_get_settings():
         if jobs:
             job = jobs[0]
             trigger = job.trigger
-            if hasattr(trigger, 'fields'):
-                # Extract frequency from cron trigger
-                # For now, we'll store the current schedule type
-                # This is a simple implementation - can be enhanced
-                frequency = '1d'  # Default to daily
+            # Try to detect frequency from trigger
+            if hasattr(trigger, 'interval'):
+                # IntervalTrigger
+                interval = trigger.interval
+                total_seconds = interval.total_seconds()
+                # Map seconds back to frequency string
+                if total_seconds == 3600:
+                    frequency = '1h'
+                elif total_seconds == 28800:
+                    frequency = '8h'
+                elif total_seconds == 86400:
+                    frequency = '1d'
+                elif total_seconds == 604800:
+                    frequency = '7d'
+                elif total_seconds == 1209600:
+                    frequency = '14d'
+                elif total_seconds == 2592000:
+                    frequency = '30d'
+            # Store in job name for easier retrieval
+            if '(' in job.name and ')' in job.name:
+                # Extract frequency from job name like "Automatic torrent check (1h)"
+                freq_match = job.name.split('(')[-1].split(')')[0]
+                if freq_match in ['1h', '8h', '1d', '7d', '14d', '30d']:
+                    frequency = freq_match
     
     return jsonify({
         'enabled': enabled,
@@ -897,12 +965,18 @@ def main():
     import atexit
     
     parser = argparse.ArgumentParser(description='Linux ISO Torrent Updater - Web Interface')
+    parser.add_argument('--version', '-v', action='version', version=f'%(prog)s {__version__}',
+                        help='Show version number and exit')
     parser.add_argument('--host', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
     parser.add_argument('--port', type=int, default=8084, help='Port to bind to (default: 8084)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     parser.add_argument('--log-file', '-l', help='Path to log file (default: console only)')
+    parser.add_argument('--schedule-enabled', default=None, 
+                        help='Enable or disable automatic checks. Options: true, false, enabled, disabled (default: from env or true)')
+    parser.add_argument('--schedule-frequency', default=None,
+                        help='Frequency for automatic checks. Options: 1h, 8h, 1d, 7d, 14d, 30d (default: from env or 1d)')
     parser.add_argument('--schedule-time', default=None, 
-                        help='Time to run automatic checks in HH:MM format (24-hour), e.g., "02:00" for 2am. Use "disabled" to disable scheduling. (default: from env or 02:00)')
+                        help='Time to run automatic checks in HH:MM format (24-hour), e.g., "02:00" for 2am. Only used for daily+ frequencies. (default: from env or 02:00)')
     parser.add_argument('--select-distros', default=None,
                         help='Comma-separated list of distributions to select by default in web interface (default: from env or all)')
     
@@ -922,8 +996,13 @@ def main():
         sys.exit(1)
     
     # Configure scheduler
+    schedule_enabled = args.schedule_enabled or os.environ.get('SCHEDULE_ENABLED', 'true')
+    schedule_frequency = args.schedule_frequency or os.environ.get('SCHEDULE_FREQUENCY', '1d')
     schedule_time = args.schedule_time or os.environ.get('SCHEDULE_TIME', '02:00')
     select_distros_str = args.select_distros or os.environ.get('SELECT_DISTROS', 'debian,ubuntu,arch,fedora,linuxmint,rocky')
+    
+    # Parse schedule_enabled (accept various formats)
+    schedule_enabled_normalized = schedule_enabled.lower() in ('true', 'enabled', '1', 'yes', 'on')
     
     # Set the global scheduled_distros for both scheduler AND web interface default selection
     global scheduled_distros
@@ -933,11 +1012,27 @@ def main():
         scheduled_distros = []
     
     # Setup scheduler if enabled
-    if schedule_time.lower() != 'disabled':
-        if not setup_scheduler(schedule_time, scheduled_distros):
-            logger.warning("Failed to setup scheduler, continuing without automatic checks")
+    if schedule_enabled_normalized and scheduled_distros:
+        # Determine trigger type based on frequency
+        if schedule_frequency in ['1h', '8h', '1d', '7d', '14d', '30d']:
+            # Use interval-based scheduling
+            from apscheduler.triggers.interval import IntervalTrigger
+            trigger = parse_frequency_to_trigger(schedule_frequency)
+            if not setup_scheduler_with_trigger(trigger, scheduled_distros, schedule_frequency):
+                logger.warning("Failed to setup scheduler, continuing without automatic checks")
+            else:
+                logger.info(f"Automatic scheduling enabled with frequency: {schedule_frequency}")
+        else:
+            # Fallback to time-based scheduling (for backward compatibility)
+            if not setup_scheduler(schedule_time, scheduled_distros):
+                logger.warning("Failed to setup scheduler, continuing without automatic checks")
+            else:
+                logger.info(f"Automatic scheduling enabled at {schedule_time} daily")
     else:
-        logger.info("Automatic scheduling disabled")
+        if not schedule_enabled_normalized:
+            logger.info("Automatic scheduling disabled by configuration")
+        elif not scheduled_distros:
+            logger.info("Automatic scheduling disabled - no distributions selected")
     
     # Register cleanup on exit
     def cleanup():

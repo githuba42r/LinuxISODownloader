@@ -18,6 +18,12 @@ from bs4 import BeautifulSoup
 import transmission_rpc
 from dotenv import load_dotenv
 
+# Import version
+try:
+    from __version__ import __version__
+except ImportError:
+    __version__ = "unknown"
+
 # Logger will be configured in main() after parsing command-line arguments
 logger = None
 
@@ -908,6 +914,12 @@ Environment Variables:
   TRANSMISSION_USER - Transmission username
   TRANSMISSION_PASS - Transmission password
         """
+    )
+    parser.add_argument(
+        '--version', '-v',
+        action='version',
+        version=f'%(prog)s {__version__}',
+        help='Show version number and exit'
     )
     parser.add_argument(
         '--dry-run', '-n',

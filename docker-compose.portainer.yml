@@ -1,0 +1,94 @@
+version: '3.8'
+
+# Portainer-optimized Docker Compose configuration
+# This configuration is designed to work with Portainer's environment variable system
+
+services:
+  # Web interface service
+  web-interface:
+    image: ghcr.io/githuba42r/linux-iso-updater:latest
+    container_name: linux-iso-updater-web
+    
+    # Port mapping for web interface (default: 8084)
+    ports:
+      - "${WEB_PORT:-8084}:8084"
+    
+    # Network configuration
+    # Option 1: Use host network for local Transmission (uncomment below)
+    # network_mode: host
+    
+    # Option 2: Use bridge network and configure TRANSMISSION_HOST
+    # This is the default and works best with Portainer
+    
+    # All configuration via environment variables
+    # Set these in Portainer's Stack environment variables section
+    environment:
+      # Transmission RPC Configuration (REQUIRED)
+      - TRANSMISSION_HOST=${TRANSMISSION_HOST:-localhost}
+      - TRANSMISSION_PORT=${TRANSMISSION_PORT:-9091}
+      - TRANSMISSION_USER=${TRANSMISSION_USER}
+      - TRANSMISSION_PASS=${TRANSMISSION_PASS}
+      
+      # Automatic Scheduling Configuration (OPTIONAL)
+      - SCHEDULE_ENABLED=${SCHEDULE_ENABLED:-true}
+      - SCHEDULE_FREQUENCY=${SCHEDULE_FREQUENCY:-1d}
+      - SCHEDULE_TIME=${SCHEDULE_TIME:-02:00}
+      
+      # Distribution Selection (OPTIONAL)
+      - SELECT_DISTROS=${SELECT_DISTROS:-debian,ubuntu,arch,fedora,mint,rocky}
+      
+      # Logging (OPTIONAL)
+      # - LOG_FILE=/logs/updater.log
+    
+    # Uncomment to persist logs to host
+    # volumes:
+    #   - ./logs:/logs
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Portainer Setup Instructions:
+# 
+# 1. In Portainer: Stacks → Add stack → Web editor
+# 2. Copy/paste this file
+# 3. Add environment variables (click "Add an environment variable"):
+#    - TRANSMISSION_HOST = localhost (or your Transmission hostname)
+#    - TRANSMISSION_PORT = 9091
+#    - TRANSMISSION_USER = your_username
+#    - TRANSMISSION_PASS = your_password
+#    - SCHEDULE_ENABLED = true
+#    - SCHEDULE_FREQUENCY = 1d
+#    - SCHEDULE_TIME = 02:00
+#    - WEB_PORT = 8084
+# 4. Click "Deploy the stack"
+# 5. Access web interface at: http://your-server-ip:8084
+#
+# Schedule Frequency Options:
+#   1h  = every hour
+#   8h  = every 8 hours
+#   1d  = daily (default)
+#   7d  = weekly
+#   14d = bi-weekly
+#   30d = monthly
+#
+# Network Configuration:
+#   - If Transmission is on the same host: use network_mode: host
+#   - If Transmission is in another container: use container name as TRANSMISSION_HOST
+#   - If using host network, remove the ports section

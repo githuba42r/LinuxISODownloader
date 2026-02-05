@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: linux-iso-updater:latest
+    image: ghcr.io/githuba42r/linux-iso-updater:latest
     container_name: linux-iso-updater-web
     
     # Port mapping for web interface
@@ -55,7 +55,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: linux-iso-updater:latest
+    image: ghcr.io/githuba42r/linux-iso-updater:latest
     container_name: linux-iso-updater
     
     # Network configuration - use host network to access local Transmission

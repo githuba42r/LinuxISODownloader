@@ -122,11 +122,16 @@ Use environment variables or command-line arguments:
 # Different Transmission server
 TRANSMISSION_HOST=192.168.1.50 ./dev-web.sh
 
-# Different schedule time
-./dev-web.sh --schedule-time 10:00
+# Different schedule configuration
+./dev-web.sh --schedule-frequency 1h --schedule-time 10:00
 
 # Disable scheduler during development
+SCHEDULE_ENABLED=false ./dev-web.sh
+# Or using the old method
 SCHEDULE_TIME=disabled ./dev-web.sh
+
+# Enable hourly checks for testing
+./dev-web.sh --schedule-enabled true --schedule-frequency 1h
 
 # Custom port to run multiple instances
 ./dev-web.sh --port 8095
