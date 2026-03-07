@@ -235,55 +235,95 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                         
                         new_torrent_data = response.content
                         
-                        # Try to add the torrent - Transmission will detect if it's a duplicate
-                        try:
-                            new_torrent = manager.client.add_torrent(new_torrent_data)
+                        # Extract info hash from new torrent and compare with existing
+                        new_info_hash = manager.get_torrent_info_hash(new_torrent_data)
+                        
+                        if new_info_hash and hasattr(existing_torrent, 'hashString'):
+                            existing_info_hash = existing_torrent.hashString
                             
-                            # Check if it's the same torrent or a different one
-                            if new_torrent.id != existing_torrent.id:
-                                # Different torrent - update is available!
-                                # Remove the newly added one (we only wanted to check)
-                                manager.client.remove_torrent(new_torrent.id, delete_data=True)
+                            if new_info_hash.lower() == existing_info_hash.lower():
+                                # Same info hash - already up to date
+                                result = {
+                                    'success': True,
+                                    'url': torrent_url,
+                                    'existing_torrent': existing_torrent.name,
+                                    'status': 'up_to_date',
+                                    'message': f'Already up to date: {existing_torrent.name}',
+                                    'checked_at': datetime.now().isoformat()
+                                }
+                                results[distro] = result
+                                broadcast_event('check_result', f'{distro} is up to date', {'distro': distro, 'result': result})
+                            else:
+                                # Different info hash - update available!
+                                logger.info(f"Update available for {distro}: {existing_torrent.name} -> new version")
+                                logger.info(f"  Existing hash: {existing_info_hash}")
+                                logger.info(f"  New hash:      {new_info_hash}")
                                 
                                 result = {
                                     'success': True,
                                     'url': torrent_url,
                                     'existing_torrent': existing_torrent.name,
-                                    'new_torrent': new_torrent.name,
                                     'status': 'update_available',
                                     'message': f'Update available! Current: {existing_torrent.name}',
-                                    'checked_at': datetime.now().isoformat()
+                                    'checked_at': datetime.now().isoformat(),
+                                    'existing_hash': existing_info_hash,
+                                    'new_hash': new_info_hash
                                 }
                                 results[distro] = result
                                 broadcast_event('check_result', f'Update available for {distro}', {'distro': distro, 'result': result})
-                            else:
-                                # Same torrent ID - already up to date
-                                result = {
-                                    'success': True,
-                                    'url': torrent_url,
-                                    'existing_torrent': existing_torrent.name,
-                                    'status': 'up_to_date',
-                                    'message': f'Already up to date: {existing_torrent.name}',
-                                    'checked_at': datetime.now().isoformat()
-                                }
-                                results[distro] = result
-                                broadcast_event('check_result', f'{distro} is up to date', {'distro': distro, 'result': result})
-                        
-                        except transmission_rpc.error.TransmissionError as e:
-                            if "duplicate" in str(e).lower():
-                                # Duplicate error means same torrent - already up to date
-                                result = {
-                                    'success': True,
-                                    'url': torrent_url,
-                                    'existing_torrent': existing_torrent.name,
-                                    'status': 'up_to_date',
-                                    'message': f'Already up to date: {existing_torrent.name}',
-                                    'checked_at': datetime.now().isoformat()
-                                }
-                                results[distro] = result
-                                broadcast_event('check_result', f'{distro} is up to date', {'distro': distro, 'result': result})
-                            else:
-                                raise
+                        else:
+                            # Fallback: if we can't compare hashes, use the old method
+                            logger.warning(f"Could not extract info hash for {distro}, using fallback method")
+                            
+                            # Try to add the torrent - Transmission will detect if it's a duplicate
+                            try:
+                                new_torrent = manager.client.add_torrent(new_torrent_data)
+                                
+                                # Check if it's the same torrent or a different one
+                                if new_torrent.id != existing_torrent.id:
+                                    # Different torrent - update is available!
+                                    # Remove the newly added one (we only wanted to check)
+                                    manager.client.remove_torrent(new_torrent.id, delete_data=True)
+                                    
+                                    result = {
+                                        'success': True,
+                                        'url': torrent_url,
+                                        'existing_torrent': existing_torrent.name,
+                                        'new_torrent': new_torrent.name,
+                                        'status': 'update_available',
+                                        'message': f'Update available! Current: {existing_torrent.name}',
+                                        'checked_at': datetime.now().isoformat()
+                                    }
+                                    results[distro] = result
+                                    broadcast_event('check_result', f'Update available for {distro}', {'distro': distro, 'result': result})
+                                else:
+                                    # Same torrent ID - already up to date
+                                    result = {
+                                        'success': True,
+                                        'url': torrent_url,
+                                        'existing_torrent': existing_torrent.name,
+                                        'status': 'up_to_date',
+                                        'message': f'Already up to date: {existing_torrent.name}',
+                                        'checked_at': datetime.now().isoformat()
+                                    }
+                                    results[distro] = result
+                                    broadcast_event('check_result', f'{distro} is up to date', {'distro': distro, 'result': result})
+                            
+                            except transmission_rpc.error.TransmissionError as e:
+                                if "duplicate" in str(e).lower():
+                                    # Duplicate error means same torrent - already up to date
+                                    result = {
+                                        'success': True,
+                                        'url': torrent_url,
+                                        'existing_torrent': existing_torrent.name,
+                                        'status': 'up_to_date',
+                                        'message': f'Already up to date: {existing_torrent.name}',
+                                        'checked_at': datetime.now().isoformat()
+                                    }
+                                    results[distro] = result
+                                    broadcast_event('check_result', f'{distro} is up to date', {'distro': distro, 'result': result})
+                                else:
+                                    raise
                     
                     except Exception as e:
                         logger.error(f"Error comparing torrents for {distro}: {e}")
