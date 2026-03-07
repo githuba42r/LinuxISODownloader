@@ -42,6 +42,17 @@ from linux_iso_torrent_updater import (
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 
+# Custom log filter to exclude noisy endpoints
+class EndpointFilter(logging.Filter):
+    """Filter out requests to specific endpoints from logs."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Filter out /api/status requests as they're too noisy
+        return '/api/status' not in record.getMessage()
+
+# Apply filter to werkzeug logger (Flask's HTTP request logger)
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.addFilter(EndpointFilter())
+
 # Global variables
 manager: Optional[TransmissionTorrentManager] = None
 last_check_time: Optional[datetime] = None
