@@ -254,23 +254,29 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                                 results[distro] = result
                                 broadcast_event('check_result', f'{distro} is up to date', {'distro': distro, 'result': result})
                             else:
-                                # Different info hash - update available!
+                                # Different info hash - update available! Download it now.
                                 logger.info(f"Update available for {distro}: {existing_torrent.name} -> new version")
                                 logger.info(f"  Existing hash: {existing_info_hash}")
                                 logger.info(f"  New hash:      {new_info_hash}")
+                                logger.info(f"Removing old torrent and downloading new version...")
+                                
+                                # Remove old torrent and add new one
+                                manager.client.remove_torrent(existing_torrent.id, delete_data=True)
+                                new_torrent = manager.client.add_torrent(new_torrent_data)
                                 
                                 result = {
                                     'success': True,
                                     'url': torrent_url,
                                     'existing_torrent': existing_torrent.name,
-                                    'status': 'update_available',
-                                    'message': f'Update available! Current: {existing_torrent.name}',
+                                    'new_torrent': new_torrent.name,
+                                    'status': 'updated',
+                                    'message': f'Updated! Old: {existing_torrent.name}, New: {new_torrent.name}',
                                     'checked_at': datetime.now().isoformat(),
                                     'existing_hash': existing_info_hash,
                                     'new_hash': new_info_hash
                                 }
                                 results[distro] = result
-                                broadcast_event('check_result', f'Update available for {distro}', {'distro': distro, 'result': result})
+                                broadcast_event('check_result', f'Updated {distro} to new version', {'distro': distro, 'result': result})
                         else:
                             # Fallback: if we can't compare hashes, use the old method
                             logger.warning(f"Could not extract info hash for {distro}, using fallback method")
@@ -281,21 +287,21 @@ def check_for_updates(distros: List[str]) -> Dict[str, Dict]:
                                 
                                 # Check if it's the same torrent or a different one
                                 if new_torrent.id != existing_torrent.id:
-                                    # Different torrent - update is available!
-                                    # Remove the newly added one (we only wanted to check)
-                                    manager.client.remove_torrent(new_torrent.id, delete_data=True)
+                                    # Different torrent - update available! Keep new, remove old
+                                    logger.info(f"Update detected for {distro}, removing old torrent...")
+                                    manager.client.remove_torrent(existing_torrent.id, delete_data=True)
                                     
                                     result = {
                                         'success': True,
                                         'url': torrent_url,
                                         'existing_torrent': existing_torrent.name,
                                         'new_torrent': new_torrent.name,
-                                        'status': 'update_available',
-                                        'message': f'Update available! Current: {existing_torrent.name}',
+                                        'status': 'updated',
+                                        'message': f'Updated! Old: {existing_torrent.name}, New: {new_torrent.name}',
                                         'checked_at': datetime.now().isoformat()
                                     }
                                     results[distro] = result
-                                    broadcast_event('check_result', f'Update available for {distro}', {'distro': distro, 'result': result})
+                                    broadcast_event('check_result', f'Updated {distro} to new version', {'distro': distro, 'result': result})
                                 else:
                                     # Same torrent ID - already up to date
                                     result = {
