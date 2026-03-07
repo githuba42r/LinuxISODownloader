@@ -18,6 +18,13 @@ from bs4 import BeautifulSoup
 import transmission_rpc
 from dotenv import load_dotenv
 
+# For torrent info hash extraction
+try:
+    import bencodepy
+    BENCODEPY_AVAILABLE = True
+except ImportError:
+    BENCODEPY_AVAILABLE = False
+
 # Import version
 try:
     from __version__ import __version__
@@ -670,6 +677,23 @@ class TransmissionTorrentManager:
             logger.error(f"Error computing torrent hash for {torrent_url}: {e}")
         return None
     
+    def get_torrent_info_hash(self, torrent_data: bytes) -> Optional[str]:
+        """Extract info hash from torrent data."""
+        if not BENCODEPY_AVAILABLE:
+            # Fallback: if bencodepy is not available, we can't extract info hash
+            logger.warning("bencodepy not available, cannot extract info hash for comparison")
+            return None
+            
+        try:
+            torrent_dict = bencodepy.decode(torrent_data)
+            info = torrent_dict[b'info']
+            info_encoded = bencodepy.encode(info)
+            info_hash = hashlib.sha1(info_encoded).hexdigest()
+            return info_hash
+        except Exception as e:
+            logger.error(f"Error extracting info hash from torrent: {e}")
+            return None
+    
     def find_existing_torrent(self, distro_name: str) -> Optional[transmission_rpc.Torrent]:
         """Find existing torrent for a distribution by name pattern."""
         if self.dry_run:
@@ -748,16 +772,34 @@ class TransmissionTorrentManager:
                     logger.info(f"[DRY-RUN] Existing {distro_name} torrent found: {existing_torrent.name}")
                     logger.info(f"[DRY-RUN] Would check if new torrent is different")
                     logger.info(f"[DRY-RUN] Actions that would be taken:")
-                    logger.info(f"[DRY-RUN]   1. Add new torrent from {latest_url}")
+                    logger.info(f"[DRY-RUN]   1. Compare info hashes")
                     logger.info(f"[DRY-RUN]   2. If different, remove old torrent: {existing_torrent.name} (ID: {existing_torrent.id})")
-                    logger.info(f"[DRY-RUN]   3. Delete old torrent data")
+                    logger.info(f"[DRY-RUN]   3. Add new torrent from {latest_url}")
                     return
                 
-                # We can't directly compare hashes, so we'll compare by checking
-                # if adding the "new" torrent would be a duplicate
                 logger.info(f"Existing {distro_name} torrent found, checking if update is needed...")
                 
-                # Add the new torrent (Transmission will detect duplicates)
+                # Extract info hash from new torrent and compare with existing
+                new_info_hash = self.get_torrent_info_hash(new_torrent_data)
+                
+                if new_info_hash and hasattr(existing_torrent, 'hashString'):
+                    existing_info_hash = existing_torrent.hashString
+                    
+                    if new_info_hash.lower() == existing_info_hash.lower():
+                        logger.info(f"{distro_name} torrent is already up to date (same info hash)")
+                        return
+                    else:
+                        logger.info(f"New version detected for {distro_name}")
+                        logger.info(f"  Existing hash: {existing_info_hash}")
+                        logger.info(f"  New hash:      {new_info_hash}")
+                        logger.info(f"Removing old torrent and adding new one...")
+                        self.client.remove_torrent(existing_torrent.id, delete_data=True)
+                        self.client.add_torrent(new_torrent_data)
+                        logger.info(f"Successfully updated {distro_name} torrent")
+                        return
+                
+                # Fallback: if we can't compare hashes, use the old method
+                logger.warning(f"Could not extract info hash for comparison, using fallback method")
                 try:
                     new_torrent = self.client.add_torrent(new_torrent_data)
                     

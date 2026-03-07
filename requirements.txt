@@ -4,3 +4,4 @@ beautifulsoup4>=4.9.0
 python-dotenv>=0.19.0
 flask>=2.3.0
 apscheduler>=3.10.0
+bencodepy>=0.9.5
